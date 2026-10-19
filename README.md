@@ -28,6 +28,10 @@ Dependencies (already in `pubspec.yaml`):
 
 | Package | Used for |
 | --- | --- |
+| `firebase_core` | Initialize Firebase on configured mobile platforms |
+| `firebase_auth` | Email/password and federated sign-in through Firebase Auth |
+| `google_sign_in` | Google sign-in on Android/iOS |
+| `flutter_facebook_auth` | Optional Facebook sign-in on Android/iOS |
 | `shared_preferences` ^2.2.3 | Saving the ledger on the device |
 | `google_fonts` ^6.2.1 | Plus Jakarta Sans and IBM Plex Mono |
 
@@ -58,6 +62,19 @@ Dependencies (already in `pubspec.yaml`):
    Debug builds already have it. iOS needs no change.
 
 On first launch the ledger is empty. Tap **Try demo data** to see the app filled in; demo rows carry a "ຕົວຢ່າງ" (example) label and can be removed from Settings.
+
+## Firebase Login (Android)
+
+The app already includes Firebase Authentication screens for email/password, Google, Facebook, and guest access. To enable Firebase on Android:
+
+1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/) and enable **Authentication → Sign-in method → Email/Password**. Enable Google only if you intend to use Google login; Facebook also needs a Facebook Developer app and is optional.
+2. Add an Android app in Firebase with the application ID from `android/app/build.gradle.kts` (`com.example.managerid` in this checkout). Keep this ID unchanged in Firebase unless you also change `applicationId` in Gradle. For Google login, add the debug SHA-1 from `keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android -keypass android`.
+3. Download `google-services.json` into `android/app/google-services.json`. Download it again after adding SHA-1 so it includes the updated OAuth client.
+4. Run `flutter pub get`, then `flutter run` on Android. Register at least one account in the app and confirm it appears under Firebase Authentication → Users.
+
+The project includes Firebase options for Android, Web, and Windows. Email/password can use Firebase Auth on those configured targets. Google and Facebook sign-in in this app are available on Android/iOS only. Firebase's Windows support is intended for local development rather than production; see the [FlutterFire setup guide](https://firebase.google.com/docs/flutter/setup).
+
+Do not commit a real Facebook app secret or service-account credentials. The Android `google-services.json` contains client configuration, not a service-account private key.
 
 ## How the numbers are calculated
 

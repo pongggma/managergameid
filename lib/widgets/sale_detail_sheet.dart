@@ -7,16 +7,17 @@ import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import 'ui.dart';
 
-typedef EditCallback = void Function(Sale sale, {bool markSold});
+typedef SaleCallback = void Function(Sale sale);
 
 /// Detail page of one account (opens when a card is tapped):
 /// big profit, tags, key / value rows, credentials with copy buttons.
 class SaleDetailSheet extends StatefulWidget {
-  const SaleDetailSheet({super.key, required this.store, required this.saleId, required this.onEdit});
+  const SaleDetailSheet({super.key, required this.store, required this.saleId, required this.onEdit, required this.onSell});
 
   final SaleStore store;
   final String saleId;
-  final EditCallback onEdit;
+  final SaleCallback onEdit;
+  final SaleCallback onSell;
 
   @override
   State<SaleDetailSheet> createState() => _SaleDetailSheetState();
@@ -130,7 +131,7 @@ class _SaleDetailSheetState extends State<SaleDetailSheet> {
               _miniBtn(Icons.copy_rounded, 'ຄັດລອກລະຫັດຜ່ານ', () => _copy('pass', s.password), done: _copied == 'pass'),
             ]),
           KvRow('ຕົ້ນທຶນ', value: money(s.cost, cur)),
-          KvRow('ລາຄາຂາຍ', value: s.price > 0 ? money(s.price, cur) : '–'),
+          if (sold) KvRow('ລາຄາຂາຍ', value: money(s.price, cur)),
           if (s.channel.isNotEmpty) KvRow('ຊ່ອງທາງຂາຍ', value: s.channel),
           if (s.buyer.isNotEmpty) KvRow('ຜູ້ຊື້', value: s.buyer),
           if (sold && s.soldAt != null) KvRow('ວັນທີຂາຍ', value: fmtDate(s.soldAt!)),
@@ -148,14 +149,21 @@ class _SaleDetailSheetState extends State<SaleDetailSheet> {
                 children: [
                   RoundButton(onTap: () => Navigator.pop(context), tooltip: 'ກັບຄືນ', child: const Icon(Icons.arrow_back_rounded, size: 22)),
                   Expanded(
-                    child: Text(s.game, textAlign: TextAlign.center, style: sans(size: 19, weight: FontWeight.w500)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Coin(s.game, size: 34, logoUrl: widget.store.logoUrl(s.game)),
+                        const SizedBox(width: 10),
+                        Flexible(child: Text(s.game, overflow: TextOverflow.ellipsis, style: sans(size: 19, weight: FontWeight.w500))),
+                      ],
+                    ),
                   ),
                   const SizedBox(width: 44),
                 ],
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 12, 4, 0),
-                child: Text(sold ? 'ກຳໄລ' : 'ຄາດວ່າກຳໄລ', style: sans(size: 17)),
+                child: Text(sold ? 'ກຳໄລ' : 'ຕົ້ນທຶນ', style: sans(size: 17)),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
@@ -166,11 +174,11 @@ class _SaleDetailSheetState extends State<SaleDetailSheet> {
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerLeft,
-                        child: AmountText(p, cur, signed: true, size: 46, weight: FontWeight.w300, color: p < 0 ? AppColors.loss : AppColors.text),
+                        child: AmountText(sold ? p : s.cost, cur, signed: sold, size: 46, weight: FontWeight.w300, color: sold && p < 0 ? AppColors.loss : AppColors.text),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    if (r != null) ButterChip(pctText(r), negative: p < 0),
+                    if (sold && r != null) ButterChip(pctText(r), negative: p < 0),
                   ],
                 ),
               ),
@@ -187,41 +195,32 @@ class _SaleDetailSheetState extends State<SaleDetailSheet> {
               ),
               DarkPanel(children: rows),
               const SizedBox(height: 18),
-              Row(
-                children: [
-                  if (!sold)
-                    Expanded(
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.magenta,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(54),
-                          shape: const StadiumBorder(),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          widget.onEdit(s, markSold: true);
-                        },
-                        child: Text('ໝາຍຂາຍ', style: sans(size: 16, weight: FontWeight.w600, color: Colors.white)),
-                      ),
-                    ),
-                  if (!sold) const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(54),
-                        shape: const StadiumBorder(),
-                        side: const BorderSide(color: AppColors.line),
-                        backgroundColor: AppColors.glass2,
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        widget.onEdit(s);
-                      },
-                      child: Text('ແກ້ໄຂ', style: sans(size: 16, weight: FontWeight.w500)),
-                    ),
-                  ),
-                ],
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.magenta,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(54),
+                  shape: const StadiumBorder(),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  widget.onSell(s);
+                },
+                child: Text(sold ? 'ແກ້ໄຂການຂາຍ' : 'ຂາຍ', style: sans(size: 16, weight: FontWeight.w600, color: Colors.white)),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(54),
+                  shape: const StadiumBorder(),
+                  side: const BorderSide(color: AppColors.line),
+                  backgroundColor: AppColors.glass2,
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  widget.onEdit(s);
+                },
+                child: Text('ແກ້ໄຂຂໍ້ມູນໄອດີ', style: sans(size: 16, weight: FontWeight.w500)),
               ),
               const SizedBox(height: 10),
               SizedBox(

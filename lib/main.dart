@@ -1,14 +1,21 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'data/sale_store.dart';
 import 'models/sale.dart';
 import 'pages/list_page.dart';
+import 'pages/login_page.dart';
+import 'services/auth_service.dart';
 import 'pages/overview_page.dart';
+import 'pages/verify_email_page.dart';
 import 'pages/settings_page.dart';
 import 'theme/app_theme.dart';
+import 'widgets/avatar.dart';
 import 'widgets/sale_detail_sheet.dart';
 import 'widgets/sale_form_sheet.dart';
+import 'widgets/sale_sell_sheet.dart';
 import 'widgets/ui.dart';
 
 Future<void> main() async {
@@ -19,15 +26,15 @@ Future<void> main() async {
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.light,
   ));
-  final store = SaleStore();
-  await store.load();
-  runApp(LedgerApp(store: store));
+  final auth = AuthService();
+  await auth.init();
+  runApp(LedgerApp(auth: auth));
 }
 
 class LedgerApp extends StatelessWidget {
-  const LedgerApp({super.key, required this.store});
+  const LedgerApp({super.key, required this.auth});
 
-  final SaleStore store;
+  final AuthService auth;
 
   @override
   Widget build(BuildContext context) {
@@ -37,16 +44,73 @@ class LedgerApp extends StatelessWidget {
       themeMode: ThemeMode.dark,
       darkTheme: buildTheme(),
       theme: buildTheme(),
-      home: HomeShell(store: store),
+      home: _Root(auth: auth),
+    );
+  }
+}
+
+/// Shows the login page until the person signs in (or continues as guest),
+/// then opens the ledger that belongs to that account.
+class _Root extends StatefulWidget {
+  const _Root({required this.auth});
+
+  final AuthService auth;
+
+  @override
+  State<_Root> createState() => _RootState();
+}
+
+class _RootState extends State<_Root> {
+  SaleStore? _store;
+  String? _loadedFor;
+  Future<void>? _loading;
+
+  void _ensureStore() {
+    final suffix = widget.auth.storageSuffix;
+    if (_loadedFor == suffix && _store != null) return;
+    _loadedFor = suffix;
+    final st = SaleStore(suffix: suffix);
+    _store = null;
+    _loading = st.load().then((_) {
+      if (mounted && _loadedFor == suffix) setState(() => _store = st);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.auth,
+      builder: (context, _) {
+        if (widget.auth.needsVerification) {
+          _loadedFor = null;
+          _store = null;
+          return VerifyEmailPage(auth: widget.auth);
+        }
+        if (!widget.auth.hasSession) {
+          _loadedFor = null;
+          _store = null;
+          return LoginPage(auth: widget.auth);
+        }
+        _ensureStore();
+        final st = _store;
+        if (st == null) {
+          return const Scaffold(
+            backgroundColor: AppColors.page,
+            body: Center(child: CircularProgressIndicator(color: AppColors.magenta)),
+          );
+        }
+        return HomeShell(key: ValueKey(_loadedFor), store: st, auth: widget.auth);
+      },
     );
   }
 }
 
 /// Pages: 0 overview, 1 all accounts, 2 settings (opened from the menu icon in the header).
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, required this.store});
+  const HomeShell({super.key, required this.store, required this.auth});
 
   final SaleStore store;
+  final AuthService auth;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -55,31 +119,37 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _page = 0;
   SaleFilter _filter = SaleFilter.all;
+  int _openSheets = 0;
 
-  void _openForm({Sale? sale, bool markSold = false}) {
-    showModalBottomSheet<void>(
+  Future<void> _sheet(Widget Function() builder) {
+    setState(() => _openSheets++);
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => SheetShell(child: SaleFormSheet(store: widget.store, sale: sale, markSold: markSold)),
-    );
+      barrierColor: const Color(0x99050308),
+      builder: (_) => SheetShell(child: builder()),
+    ).whenComplete(() {
+      if (mounted) setState(() => _openSheets--);
+    });
+  }
+
+  void _openForm({Sale? sale}) {
+    _sheet(() => SaleFormSheet(store: widget.store, sale: sale));
+  }
+
+  void _openSell(Sale sale) {
+    _sheet(() => SaleSellSheet(store: widget.store, sale: sale));
   }
 
   void _openDetail(Sale sale) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => SheetShell(
-        child: SaleDetailSheet(
+    _sheet(() => SaleDetailSheet(
           store: widget.store,
           saleId: sale.id,
-          onEdit: (s, {bool markSold = false}) => _openForm(sale: s, markSold: markSold),
-        ),
-      ),
-    );
+          onEdit: (s) => _openForm(sale: s),
+          onSell: _openSell,
+        ));
   }
 
   void _goList(SaleFilter f) => setState(() {
@@ -89,27 +159,25 @@ class _HomeShellState extends State<HomeShell> {
 
   Widget _header() {
     if (_page == 0) {
+      final acc = widget.auth.account;
+      // Logged-in name, else email, else a guest label.
+      final title = widget.auth.displayLabel;
+      final subtitle = (acc != null && widget.auth.profileName.isNotEmpty) ? acc.email : '';
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 8, 4),
         child: Row(
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFF5CF6), Color(0xFF7B21D6)]),
-                boxShadow: const [BoxShadow(color: Color(0x47FF14F0), blurRadius: 22, offset: Offset(0, 8))],
-              ),
-              child: const Icon(Icons.sports_esports_outlined, color: Colors.white, size: 26),
+            GestureDetector(
+              onTap: () => showProfileEditor(context, widget.auth),
+              child: Avatar(widget.auth.avatar, size: 50),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('User pingpong', style: sans(size: 17, weight: FontWeight.w500)),
-                  Text('ບັນຊີເກມ', style: sans(size: 12, color: AppColors.muted)),
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(size: 17, weight: FontWeight.w500)),
+                  if (subtitle.isNotEmpty) Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(size: 12, color: AppColors.muted)),
                 ],
               ),
             ),
@@ -170,7 +238,7 @@ class _HomeShellState extends State<HomeShell> {
                                 onOpenDetail: _openDetail,
                                 onAdd: () => _openForm(),
                               ),
-                              SettingsPage(store: widget.store),
+                              SettingsPage(store: widget.store, auth: widget.auth),
                             ],
                           ),
                         ),
@@ -187,6 +255,23 @@ class _HomeShellState extends State<HomeShell> {
               page: _page,
               onSelect: (i) => setState(() => _page = i),
               onAdd: () => _openForm(),
+            ),
+          ),
+          // Blurs everything behind an open sheet (page, header, tab bar).
+          Positioned.fill(
+            child: IgnorePointer(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: _openSheets > 0 ? 14 : 0),
+                duration: const Duration(milliseconds: 250),
+                builder: (_, sigma, __) => sigma < 0.1
+                    ? const SizedBox.shrink()
+                    : ClipRect(
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+              ),
             ),
           ),
         ],

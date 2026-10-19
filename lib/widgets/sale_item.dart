@@ -7,11 +7,12 @@ import 'ui.dart';
 
 /// One account as a dark rounded card: round badge, name, status and profit.
 class SaleItem extends StatelessWidget {
-  const SaleItem({super.key, required this.sale, required this.currency, required this.onTap});
+  const SaleItem({super.key, required this.sale, required this.currency, required this.onTap, this.logoUrl});
 
   final Sale sale;
   final String currency;
   final VoidCallback onTap;
+  final String? logoUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +25,7 @@ class SaleItem extends StatelessWidget {
         : [s.channel, s.buyer].where((e) => e.isNotEmpty).join(' · ');
 
     final meta = <Widget>[];
-    if (sold || s.price > 0) {
+    if (sold) {
       meta.add(Text(pctText(r), style: sans(size: 12, color: p < 0 ? AppColors.loss : AppColors.butter)));
     }
     if (sold && !s.paid) {
@@ -35,7 +36,7 @@ class SaleItem extends StatelessWidget {
     }
 
     final Color amountColor = sold ? (p < 0 ? AppColors.loss : AppColors.butter) : AppColors.muted;
-    final double amountValue = (sold || s.price > 0) ? p : s.cost;
+    final double amountValue = sold ? p : s.cost;
 
     return Material(
       color: Colors.transparent,
@@ -55,7 +56,7 @@ class SaleItem extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Coin(s.game),
+              Coin(s.game, logoUrl: logoUrl),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -83,7 +84,7 @@ class SaleItem extends StatelessWidget {
                 children: [
                   StatusTag(s.status),
                   const SizedBox(height: 6),
-                  AmountText(amountValue, currency, signed: sold || s.price > 0, size: 15, weight: FontWeight.w600, color: amountColor),
+                  AmountText(amountValue, currency, signed: sold, size: 15, weight: FontWeight.w600, color: amountColor),
                 ],
               ),
             ],

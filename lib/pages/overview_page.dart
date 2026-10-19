@@ -31,6 +31,7 @@ class OverviewPage extends StatefulWidget {
 
 class _OverviewPageState extends State<OverviewPage> {
   bool _thisMonth = false;
+  ChartPeriod _chart = ChartPeriod.month;
 
   Widget _periodToggle() {
     Widget item(String label, bool value) {
@@ -56,6 +57,37 @@ class _OverviewPageState extends State<OverviewPage> {
         border: Border.all(color: AppColors.line),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [item('ທັງໝົດ', false), item('ເດືອນນີ້', true)]),
+    );
+  }
+
+  Widget _chartToggle() {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.glass,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        children: [
+          for (final p in ChartPeriod.values)
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => setState(() => _chart = p),
+                child: Container(
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _chart == p ? AppColors.magenta : Colors.transparent,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(p.label, style: sans(size: 14, weight: _chart == p ? FontWeight.w600 : FontWeight.w400, color: _chart == p ? Colors.white : AppColors.muted)),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -165,8 +197,10 @@ class _OverviewPageState extends State<OverviewPage> {
             _action(Icons.account_balance_wallet_outlined, 'ຄ້າງຈ່າຍ', 'ເບິ່ງລາຍການຄ້າງຈ່າຍ', () => widget.onGo(SaleFilter.unpaid)),
           ],
         ),
-        const SectionTitle('ກຳໄລລາຍເດືອນ', note: '6 ເດືອນຫຼ້າສຸດ'),
-        ProfitChart(bars: store.monthly()),
+        SectionTitle('ກຳໄລ', note: _chart.note),
+        _chartToggle(),
+        const SizedBox(height: 12),
+        ProfitChart(key: ValueKey(_chart), bars: store.bars(_chart), currency: cur),
         const SizedBox(height: 22),
         DarkPanel(children: [
           KvRow('ລາຍຮັບ', value: money(sum.revenue, cur)),
@@ -180,7 +214,7 @@ class _OverviewPageState extends State<OverviewPage> {
           _empty()
         else
           for (final s in recent) ...[
-            SaleItem(sale: s, currency: cur, onTap: () => widget.onOpenDetail(s)),
+            SaleItem(sale: s, currency: cur, logoUrl: store.logoUrl(s.game), onTap: () => widget.onOpenDetail(s)),
             const SizedBox(height: 12),
           ],
       ],

@@ -36,14 +36,33 @@ String groupInt(int n) {
   return (n < 0 ? '-' : '') + b.toString();
 }
 
+/// Digits of a positive amount: USD keeps cents (1,234.50), others are whole numbers.
+String digitsFor(double abs, String currency) {
+  if (currency == 'USD') {
+    final cents = (abs * 100).round();
+    final whole = groupInt(cents ~/ 100);
+    final frac = (cents % 100).toString().padLeft(2, '0');
+    return '$whole.$frac';
+  }
+  return groupInt(abs.round());
+}
+
+/// Sign for an amount, based on what is actually shown (so -0.001 shows no sign).
+String signFor(double v, String currency, {bool signed = false}) {
+  final shown = currency == 'USD' ? (v * 100).round() : v.round();
+  return shown < 0 ? '-' : (signed && shown > 0 ? '+' : '');
+}
+
 /// LAK shows the symbol after the number (1,200,000 ₭); THB/USD before it.
 String money(double v, String currency, {bool signed = false}) {
   final sym = currencySymbols[currency] ?? '';
-  final r = v.round();
-  final sign = r < 0 ? '-' : (signed && r > 0 ? '+' : '');
-  final a = groupInt(r.abs());
+  final sign = signFor(v, currency, signed: signed);
+  final a = digitsFor(v.abs(), currency);
   return currency == 'LAK' ? '$sign$a $sym' : '$sign$sym$a';
 }
+
+/// Round an amount the way [currency] is shown (cents for USD, whole units otherwise).
+double roundFor(double v, String currency) => currency == 'USD' ? (v * 100).round() / 100 : v.roundToDouble();
 
 String compact(double v) {
   final a = v.abs();

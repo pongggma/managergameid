@@ -38,9 +38,8 @@ class AmountText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final r = value.round();
-    final sign = r < 0 ? '-' : (signed && r > 0 ? '+' : '');
-    final digits = groupInt(r.abs());
+    final sign = signFor(value, currency, signed: signed);
+    final digits = digitsFor(value.abs(), currency);
     final sym = currencySymbols[currency] ?? '';
     final main = sans(
       size: size,
@@ -123,13 +122,36 @@ class StatusTag extends StatelessWidget {
 
 /// Round game badge with initials on a coloured disc.
 class Coin extends StatelessWidget {
-  const Coin(this.game, {super.key, this.size = 60});
+  const Coin(this.game, {super.key, this.size = 60, this.logoUrl});
 
   final String game;
   final double size;
+  final String? logoUrl;
 
   @override
   Widget build(BuildContext context) {
+    final url = logoUrl;
+    if (url != null && url.isNotEmpty) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0x24FFFFFF)),
+          boxShadow: const [BoxShadow(color: Color(0x80000000), blurRadius: 18, offset: Offset(0, 8))],
+        ),
+        child: ClipOval(
+          child: Image.network(
+            url,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Coin(game, size: size),
+            loadingBuilder: (_, child, p) => p == null ? child : Coin(game, size: size),
+          ),
+        ),
+      );
+    }
     final c = coinColors(game);
     return Container(
       width: size,
@@ -350,9 +372,11 @@ class SheetShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(36)),
-      child: DecoratedBox(
+      // Solid base first, so nothing behind the sheet shows through the gradients.
+      child: ColoredBox(
+        color: const Color(0xFF0B0A0E),
+        child: DecoratedBox(
         decoration: const BoxDecoration(
-          color: Color(0xFF0B0A0E),
           gradient: RadialGradient(
             center: Alignment(0, -1.12),
             radius: 1.15,
@@ -382,6 +406,117 @@ class SheetShell extends StatelessWidget {
           ),
         ),
       ),
+      ),
     );
+  }
+}
+
+/// Slide-to-confirm track: drag the magenta knob to the end to run [onConfirm].
+/// If [onConfirm] returns false (e.g. validation failed) the knob springs back.
+class SlideToSave extends StatefulWidget {
+  const SlideToSave({super.key, required this.label, required this.onConfirm, this.busy = false});
+
+  final String label;
+  final Future<bool> Function() onConfirm;
+  final bool busy;
+
+  @override
+  State<SlideToSave> createState() => _SlideToSaveState();
+}
+
+class _SlideToSaveState extends State<SlideToSave> with SingleTickerProviderStateMixin {
+  static const double _knob = 56;
+  static const double _pad = 6;
+  double _x = 0; // 0..1
+  bool _done = false;
+  late final AnimationController _back = AnimationController(vsync: this, duration: const Duration(milliseconds: 220))
+    ..addListener(() => setState(() => _x = _from * (1 - Curves.easeOut.transform(_back.value))));
+  double _from = 0;
+
+  @override
+  void dispose() {
+    _back.dispose();
+    super.dispose();
+  }
+
+  void _reset() {
+    _from = _x;
+    _back.forward(from: 0);
+  }
+
+  Future<void> _end() async {
+    if (_done || widget.busy) return;
+    if (_x < 0.85) return _reset();
+    setState(() {
+      _x = 1;
+      _done = true;
+    });
+    final ok = await widget.onConfirm();
+    if (!mounted) return;
+    if (!ok) {
+      setState(() => _done = false);
+      _reset();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, c) {
+      final travel = (c.maxWidth - _knob - _pad * 2).clamp(1.0, double.infinity);
+      return Container(
+        height: _knob + _pad * 2,
+        decoration: BoxDecoration(
+          color: const Color(0xEB08070B),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: Stack(
+          children: [
+            // magenta fill behind the knob
+            Positioned(
+              left: _pad,
+              top: _pad,
+              bottom: _pad,
+              width: _knob + travel * _x,
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: AppColors.magenta.withOpacity(.28), borderRadius: BorderRadius.circular(999)),
+              ),
+            ),
+            Center(
+              child: Opacity(
+                opacity: (1 - _x * 1.4).clamp(0.0, 1.0),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: _knob),
+                  child: Text(_done ? '…' : '${widget.label}  ›››', style: sans(size: 16, weight: FontWeight.w500, color: AppColors.muted)),
+                ),
+              ),
+            ),
+            Positioned(
+              left: _pad + travel * _x,
+              top: _pad,
+              child: GestureDetector(
+                onHorizontalDragStart: (_) => _back.stop(),
+                onHorizontalDragUpdate: (d) {
+                  if (_done || widget.busy) return;
+                  setState(() => _x = (_x + d.delta.dx / travel).clamp(0.0, 1.0));
+                },
+                onHorizontalDragEnd: (_) => _end(),
+                onHorizontalDragCancel: () => _end(),
+                child: Container(
+                  width: _knob,
+                  height: _knob,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.magenta,
+                    boxShadow: [BoxShadow(color: Color(0x80FF14F0), blurRadius: 18)],
+                  ),
+                  child: Icon(_done ? Icons.check_rounded : Icons.arrow_forward_rounded, color: Colors.white, size: 28),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 }

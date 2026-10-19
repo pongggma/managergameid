@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "959986148667",
+    "project_id": "demointurn",
+    "storage_bucket": "demointurn.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:959986148667:android:8ee46615a1f2ceb0bac31e",
+        "android_client_info": {
+          "package_name": "com.example.managerid"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "959986148667-hbejc85k5g06uhn1r4ikgo6klvito7f9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.managerid",
+            "certificate_hash": "1c4f536343b3b2cc24413b81281ff8ae0c576515"
+          }
+        },
+        {
+          "client_id": "959986148667-pv1t1lkasisfq7dtpdrhi32vdll98g1a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAGmHeeJJqGw1Nl4_v8YMYPz2Z73b9gkks"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "959986148667-pv1t1lkasisfq7dtpdrhi32vdll98g1a.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

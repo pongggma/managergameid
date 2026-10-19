@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/sale.dart';
+import '../services/exchange_rate.dart';
+import '../services/game_logo.dart';
 import '../utils/format.dart';
 
 enum SaleFilter { all, stock, reserved, sold, unpaid }
@@ -49,20 +51,77 @@ class Summary {
   double get average => soldCount == 0 ? 0 : profit / soldCount;
 }
 
+enum ChartPeriod { week, month, year }
+
+extension ChartPeriodInfo on ChartPeriod {
+  String get label => const {ChartPeriod.week: '1 ອາທິດ', ChartPeriod.month: '1 ເດືອນ', ChartPeriod.year: '1 ປີ'}[this]!;
+  String get note => const {ChartPeriod.week: '7 ວັນຫຼ້າສຸດ', ChartPeriod.month: '30 ວັນຫຼ້າສຸດ', ChartPeriod.year: '12 ເດືອນຫຼ້າສຸດ'}[this]!;
+}
+
 class MonthBar {
-  const MonthBar(this.label, this.value, this.isNow);
-  final String label;
-  final double value;
+  const MonthBar(this.label, this.value, this.isNow, {this.title = '', this.sub = '', this.count = 0, this.revenue = 0});
+  final String label; // short label under the bar
+  final double value; // profit
   final bool isNow;
+  final String sub; // optional 2nd line under the label (year)
+  final String title; // long label for the tooltip
+  final int count; // accounts sold in this bucket
+  final double revenue;
 }
 
 /// Keeps every sale on the device (SharedPreferences, as one JSON string).
 class SaleStore extends ChangeNotifier {
-  static const _key = 'game-id-ledger-v1';
+  /// [suffix] is empty for guest mode (the original ledger) or the account uid.
+  SaleStore({String suffix = ''}) : _key = suffix.isEmpty ? 'game-id-ledger-v1' : 'game-id-ledger-v1-$suffix';
+
+  final String _key;
 
   SharedPreferences? _prefs;
   List<Sale> _sales = [];
   String _currency = 'LAK';
+  List<String> _games = []; // games used before, most recent first
+  List<String> _channels = []; // sales channels used before, most recent first
+  final Map<String, String> _logos = {}; // lower-case game name -> icon url ('' = none found)
+  final Set<String> _fetching = {};
+  String _rateNote = ''; // e.g. "1 THB = 650.12 LAK · 13/10/2026"
+
+  String get rateNote => _rateNote;
+
+  static const defaultChannels = ['Facebook', 'TikTok', 'WhatsApp', 'Telegram', 'Discord', 'Line'];
+
+  List<String> get knownGames => List.unmodifiable(_games);
+
+  /// Channels used before first, then the default ones not used yet.
+  List<String> get knownChannels => [
+        ..._channels,
+        for (final c in defaultChannels)
+          if (!_channels.any((e) => e.toLowerCase() == c.toLowerCase())) c,
+      ];
+
+  static String _k(String g) => g.trim().toLowerCase();
+
+  List<String> _bump(List<String> list, String v) {
+    final t = v.trim();
+    if (t.isEmpty) return list;
+    return [t, ...list.where((e) => _k(e) != _k(t))];
+  }
+
+  /// Icon url for a game, or null. Starts a background lookup the first time
+  /// a name is seen, and the result is saved so it is not fetched again.
+  String? logoUrl(String game) {
+    final k = _k(game);
+    if (k.isEmpty) return null;
+    final c = _logos[k];
+    if (c != null) return c.isEmpty ? null : c;
+    if (_fetching.add(k)) {
+      GameLogoService.find(game).then((url) {
+        _fetching.remove(k);
+        if (url != null) _logos[k] = url; // failures are not cached, so they retry next launch
+        if (url != null) _persist();
+      });
+    }
+    return null;
+  }
 
   List<Sale> get sales => List.unmodifiable(_sales);
   String get currency => _currency;
@@ -79,8 +138,22 @@ class SaleStore extends ChangeNotifier {
       _sales = ((data['sales'] as List?) ?? [])
           .map((e) => Sale.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
+      _games = ((data['games'] as List?) ?? []).whereType<String>().toList();
+      _channels = ((data['channels'] as List?) ?? []).whereType<String>().toList();
+      _rateNote = (data['rateNote'] as String?) ?? '';
+      final logos = data['logos'];
+      if (logos is Map) {
+        logos.forEach((k, v) {
+          if (k is String && v is String && v.isNotEmpty) _logos[k] = v;
+        });
+      }
     } catch (_) {
       _sales = [];
+    }
+    // Make sure games from older saved data are remembered too.
+    for (final s in sorted().reversed) {
+      _games = _bump(_games, s.game);
+      _channels = _bump(_channels, s.channel);
     }
   }
 
@@ -91,6 +164,14 @@ class SaleStore extends ChangeNotifier {
       jsonEncode({
         'currency': _currency,
         'sales': _sales.map((s) => s.toJson()).toList(),
+        'rateNote': _rateNote,
+        'games': _games,
+        'channels': _channels,
+        // keep icons only for games that are remembered
+        'logos': {
+          for (final g in _games)
+            if ((_logos[_k(g)] ?? '').isNotEmpty) _k(g): _logos[_k(g)],
+        },
       }),
     );
   }
@@ -99,6 +180,8 @@ class SaleStore extends ChangeNotifier {
       '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}${Random().nextInt(1 << 20).toRadixString(36)}';
 
   Future<void> upsert(Sale sale) async {
+    _games = _bump(_games, sale.game);
+    _channels = _bump(_channels, sale.channel);
     final i = _sales.indexWhere((s) => s.id == sale.id);
     if (i >= 0) {
       _sales[i] = sale;
@@ -113,9 +196,42 @@ class SaleStore extends ChangeNotifier {
     await _persist();
   }
 
-  Future<void> setCurrency(String c) async {
-    _currency = c;
+  /// Switch currency and convert every cost and price at today's rate.
+  /// Returns null on success, or an error message (nothing is changed then).
+  Future<String?> changeCurrency(String to) async {
+    final from = _currency;
+    if (to == from) return null;
+    final ExchangeRates rates;
+    try {
+      rates = await ExchangeRates.fetch([from, to]);
+    } catch (_) {
+      return 'ດຶງອັດຕາແລກປ່ຽນບໍ່ໄດ້ ກວດອິນເຕີເນັດແລ້ວລອງໃໝ່';
+    }
+    final f = rates.factor(from, to);
+    _sales = _sales
+        .map((s) => Sale(
+              id: s.id,
+              game: s.game,
+              accountId: s.accountId,
+              email: s.email,
+              password: s.password,
+              status: s.status,
+              cost: roundFor(s.cost * f, to),
+              price: roundFor(s.price * f, to),
+              channel: s.channel,
+              buyer: s.buyer,
+              paid: s.paid,
+              soldAt: s.soldAt,
+              note: s.note,
+              createdAt: s.createdAt,
+              demo: s.demo,
+            ))
+        .toList();
+    _currency = to;
+    final rate = f >= 100 ? f.toStringAsFixed(0) : f.toStringAsFixed(f >= 1 ? 2 : 4);
+    _rateNote = '1 $from = $rate $to  ·  ${fmtDate(rates.updated)}';
     await _persist();
+    return null;
   }
 
   // ---------- queries ----------
@@ -195,23 +311,64 @@ class SaleStore extends ChangeNotifier {
     );
   }
 
-  /// Profit per month for the last 6 months.
-  List<MonthBar> monthly() {
+  static const _weekdays = ['ຈັນ', 'ອັງຄານ', 'ພຸດ', 'ພະຫັດ', 'ສຸກ', 'ເສົາ', 'ອາທິດ'];
+
+  /// Profit of sold accounts per bucket:
+  /// 1 week = the last 7 days (one bar per day),
+  /// 1 month = the last 30 days (one bar per day),
+  /// 1 year = the last 12 months (one bar per month).
+  List<MonthBar> bars(ChartPeriod period) {
     final now = DateTime.now();
-    final bars = <MonthBar>[];
-    for (var i = 5; i >= 0; i--) {
-      final d = DateTime(now.year, now.month - i, 1);
-      var total = 0.0;
-      for (final s in _sales) {
-        final sd = s.soldAt;
-        if (s.isSold && sd != null && sd.year == d.year && sd.month == d.month) {
-          total += s.profit;
+    final today = DateTime(now.year, now.month, now.day);
+    // Each bucket: label, [start, end) range, tooltip title, second label line
+    final buckets = <(String, DateTime, DateTime, String, String)>[];
+    switch (period) {
+      case ChartPeriod.week:
+      case ChartPeriod.month:
+        final n = period == ChartPeriod.week ? 7 : 30;
+        for (var i = n - 1; i >= 0; i--) {
+          final d = DateTime(today.year, today.month, today.day - i);
+          final show = period == ChartPeriod.week || i % 5 == 0; // 30 bars: label every 5th day
+          buckets.add((
+            show ? '${d.day}/${d.month}' : '',
+            d,
+            DateTime(d.year, d.month, d.day + 1),
+            'ວັນ${_weekdays[d.weekday - 1]} ${d.day}/${d.month}/${d.year}',
+            '',
+          ));
         }
-      }
-      bars.add(MonthBar(laoMonths[d.month - 1], total, i == 0));
+      case ChartPeriod.year:
+        for (var i = 11; i >= 0; i--) {
+          final st = DateTime(now.year, now.month - i, 1);
+          buckets.add((
+            '${st.month}',
+            st,
+            DateTime(st.year, st.month + 1, 1),
+            '${laoMonths[st.month - 1]} ${st.year}',
+            (i == 11 || st.month == 1) ? '${st.year}' : '',
+          ));
+        }
     }
-    return bars;
+    return [
+      for (var i = 0; i < buckets.length; i++)
+        () {
+          final inB = _sales
+              .where((s) => s.isSold && s.soldAt != null && !s.soldAt!.isBefore(buckets[i].$2) && s.soldAt!.isBefore(buckets[i].$3))
+              .toList();
+          return MonthBar(
+            buckets[i].$1,
+            inB.fold(0.0, (t, s) => t + s.profit),
+            i == buckets.length - 1,
+            title: buckets[i].$4,
+            sub: buckets[i].$5,
+            count: inB.length,
+            revenue: inB.fold(0.0, (t, s) => t + s.price),
+          );
+        }(),
+    ];
   }
+
+  List<MonthBar> monthly() => bars(ChartPeriod.month);
 
   // ---------- export / demo ----------
 

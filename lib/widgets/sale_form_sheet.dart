@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -7,29 +9,27 @@ import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import 'ui.dart';
 
-/// Add / edit sheet. Only the game name is required;
-/// ID, email, password and everything else can stay empty.
+/// Add / edit sheet for the account itself: game, ID, email, password, cost.
+/// Only the game name is required. Selling details (price, buyer, paid, note)
+/// live in the separate sell sheet that opens from the "ຂາຍ" button afterwards.
 class SaleFormSheet extends StatefulWidget {
-  const SaleFormSheet({super.key, required this.store, this.sale, this.markSold = false});
+  const SaleFormSheet({super.key, required this.store, this.sale});
 
   final SaleStore store;
   final Sale? sale;
-  final bool markSold;
 
   @override
   State<SaleFormSheet> createState() => _SaleFormSheetState();
 }
 
 class _SaleFormSheetState extends State<SaleFormSheet> {
-  static const _channels = ['Facebook', 'TikTok', 'WhatsApp', 'Telegram', 'Discord', 'Line'];
-
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _game, _aid, _email, _pass, _cost, _price, _channel, _buyer, _note;
+  late final TextEditingController _game, _aid, _email, _pass, _cost;
   late SaleStatus _status;
-  DateTime? _soldAt;
-  bool _paid = false;
   bool _hidePass = true;
   bool _saving = false;
+  String _logoName = '';
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -40,26 +40,29 @@ class _SaleFormSheetState extends State<SaleFormSheet> {
     _email = TextEditingController(text: s?.email ?? '');
     _pass = TextEditingController(text: s?.password ?? '');
     _cost = TextEditingController(text: plainNumber(s?.cost ?? 0));
-    _price = TextEditingController(text: plainNumber(s?.price ?? 0));
-    _channel = TextEditingController(text: s?.channel ?? '');
-    _buyer = TextEditingController(text: s?.buyer ?? '');
-    _note = TextEditingController(text: s?.note ?? '');
     _status = s?.status ?? SaleStatus.stock;
-    _soldAt = s?.soldAt;
-    _paid = s?.paid ?? false;
-    if (widget.markSold) {
-      _status = SaleStatus.sold;
-      _soldAt ??= DateTime.now();
-    }
-    _cost.addListener(_refresh);
-    _price.addListener(_refresh);
+    _logoName = s?.game ?? '';
+    _game.addListener(_onGameChanged);
+    widget.store.addListener(_refresh);
   }
 
-  void _refresh() => setState(() {});
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
+  void _onGameChanged() {
+    setState(() {});
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => _logoName = _game.text.trim());
+    });
+  }
 
   @override
   void dispose() {
-    for (final c in [_game, _aid, _email, _pass, _cost, _price, _channel, _buyer, _note]) {
+    _debounce?.cancel();
+    widget.store.removeListener(_refresh);
+    for (final c in [_game, _aid, _email, _pass, _cost]) {
       c.dispose();
     }
     super.dispose();
@@ -74,25 +77,8 @@ class _SaleFormSheetState extends State<SaleFormSheet> {
 
   String? _numValidator(String? t) => _num(t ?? '') == null ? 'ຕ້ອງເປັນຕົວເລກບໍ່ຕິດລົບ' : null;
 
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final d = await showDatePicker(
-      context: context,
-      initialDate: _soldAt ?? now,
-      firstDate: DateTime(2015),
-      lastDate: now.add(const Duration(days: 1)),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.dark(primary: AppColors.magenta, onPrimary: Colors.white, surface: Color(0xFF1A171F)),
-        ),
-        child: child!,
-      ),
-    );
-    if (d != null) setState(() => _soldAt = d);
-  }
-
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<bool> _save() async {
+    if (!_formKey.currentState!.validate()) return false;
     setState(() => _saving = true);
     final old = widget.sale;
     final sale = Sale(
@@ -103,16 +89,18 @@ class _SaleFormSheetState extends State<SaleFormSheet> {
       password: _pass.text,
       status: _status,
       cost: _num(_cost.text) ?? 0,
-      price: _num(_price.text) ?? 0,
-      channel: _channel.text.trim(),
-      buyer: _buyer.text.trim(),
-      paid: _paid,
-      soldAt: _status == SaleStatus.sold ? (_soldAt ?? DateTime.now()) : null,
-      note: _note.text.trim(),
+      price: old?.price ?? 0,
+      channel: old?.channel ?? '',
+      buyer: old?.buyer ?? '',
+      paid: old?.paid ?? false,
+      soldAt: old?.soldAt,
+      note: old?.note ?? '',
       createdAt: old?.createdAt ?? DateTime.now(),
+      demo: old?.demo ?? false,
     );
     await widget.store.upsert(sale);
     if (mounted) Navigator.pop(context);
+    return true;
   }
 
   // ---------- small building blocks ----------
@@ -258,16 +246,13 @@ class _SaleFormSheetState extends State<SaleFormSheet> {
   Widget _statusPills() {
     return Row(
       children: [
-        for (final s in SaleStatus.values)
+        for (final s in const [SaleStatus.stock, SaleStatus.reserved])
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(right: s == SaleStatus.sold ? 0 : 8),
+              padding: EdgeInsets.only(right: s == SaleStatus.reserved ? 0 : 8),
               child: InkWell(
                 borderRadius: BorderRadius.circular(999),
-                onTap: () => setState(() {
-                  _status = s;
-                  if (s == SaleStatus.sold) _soldAt ??= DateTime.now();
-                }),
+                onTap: () => setState(() => _status = s),
                 child: Container(
                   height: 44,
                   alignment: Alignment.center,
@@ -285,14 +270,90 @@ class _SaleFormSheetState extends State<SaleFormSheet> {
     );
   }
 
+  Widget _gameField() {
+    final typed = _game.text.trim();
+    final logo = _logoName.isEmpty ? null : widget.store.logoUrl(_logoName);
+    final known = widget.store.knownGames;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _glassBox(
+          padding: const EdgeInsets.fromLTRB(12, 10, 18, 12),
+          child: Row(
+            children: [
+              Coin(typed.isEmpty ? '?' : typed, size: 48, logoUrl: logo),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('ເກມ', style: sans(size: 12, color: AppColors.muted)),
+                    TextFormField(
+                      controller: _game,
+                      autocorrect: false,
+                      textCapitalization: TextCapitalization.words,
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'ກະລຸນາໃສ່ຊື່ເກມ' : null,
+                      style: sans(size: 17),
+                      cursorColor: AppColors.butter,
+                      decoration: _bare(hint: 'ເຊັ່ນ Free Fire'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (known.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 10, 0, 6),
+            child: Text('ເລືອກເກມທີ່ເຄີຍໃຊ້', style: sans(size: 12, color: AppColors.muted)),
+          ),
+          SizedBox(
+            height: 42,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: known.length > 15 ? 15 : known.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final g = known[i];
+                final on = g.toLowerCase() == typed.toLowerCase();
+                return InkWell(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: () {
+                    _debounce?.cancel();
+                    _game.text = g;
+                    setState(() => _logoName = g);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(5, 0, 14, 0),
+                    decoration: BoxDecoration(
+                      color: on ? AppColors.magenta : AppColors.glass,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: on ? AppColors.magenta : AppColors.line),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Coin(g, size: 32, logoUrl: widget.store.logoUrl(g)),
+                        const SizedBox(width: 8),
+                        Text(g, style: sans(size: 14, weight: FontWeight.w500, color: on ? Colors.white : AppColors.text)),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cur = widget.store.currency;
-    final cost = _num(_cost.text) ?? 0;
-    final profit = (_num(_price.text) ?? 0) - cost;
-    final r = roi(cost, profit);
     final isEdit = widget.sale != null;
-    final title = isEdit ? (widget.markSold ? 'ໝາຍວ່າຂາຍແລ້ວ' : 'ແກ້ໄຂໄອດີ') : 'ເພີ່ມໄອດີ';
+    final isSold = widget.sale?.isSold ?? false;
     const gap = SizedBox(height: 12);
 
     return Padding(
@@ -311,12 +372,12 @@ class _SaleFormSheetState extends State<SaleFormSheet> {
                     Row(
                       children: [
                         RoundButton(onTap: () => Navigator.pop(context), tooltip: 'ປິດ', child: const Icon(Icons.arrow_back_rounded, size: 22)),
-                        Expanded(child: Text(title, textAlign: TextAlign.center, style: sans(size: 19, weight: FontWeight.w500))),
+                        Expanded(child: Text(isEdit ? 'ແກ້ໄຂໄອດີ' : 'ເພີ່ມໄອດີ', textAlign: TextAlign.center, style: sans(size: 19, weight: FontWeight.w500))),
                         const SizedBox(width: 44),
                       ],
                     ),
                     gap,
-                    _field('ເກມ', _game, validator: (v) => (v == null || v.trim().isEmpty) ? 'ກະລຸນາໃສ່ຊື່ເກມ' : null),
+                    _gameField(),
                     gap,
                     _field('ໄອດີ / ຊື່ບັນຊີ', _aid, optional: true),
                     gap,
@@ -334,137 +395,25 @@ class _SaleFormSheetState extends State<SaleFormSheet> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Column(
+                    _moneyCard('ຕົ້ນທຶນ', _cost, cur),
+                    if (!isSold) ...[
+                      const SizedBox(height: 14),
+                      _glassBox(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _moneyCard('ຕົ້ນທຶນ', _cost, cur),
-                            const SizedBox(height: 14),
-                            _moneyCard('ລາຄາຂາຍ', _price, cur),
+                            Text('ສະຖານະ', style: sans(size: 12, color: AppColors.muted)),
+                            const SizedBox(height: 8),
+                            _statusPills(),
                           ],
-                        ),
-                        Positioned.fill(
-                          child: Center(
-                            child: Container(
-                              width: 60,
-                              height: 60,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white,
-                                boxShadow: [BoxShadow(color: Color(0xEB0B0A0E), spreadRadius: 8)],
-                              ),
-                              child: const Icon(Icons.swap_vert_rounded, size: 28, color: Color(0xFF14101A)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(6, 18, 6, 4),
-                      child: Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 12,
-                        runSpacing: 6,
-                        children: [
-                          Text('ກຳໄລ', style: sans(size: 14, color: AppColors.muted)),
-                          const Icon(Icons.arrow_forward_rounded, size: 20, color: AppColors.muted),
-                          Text(
-                            money(profit, cur, signed: true),
-                            style: sans(size: 20, weight: FontWeight.w500, color: profit < 0 ? AppColors.loss : (profit > 0 ? AppColors.butter : AppColors.text)),
-                          ),
-                          if (r != null) ButterChip(pctText(r), negative: profit < 0, small: true),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    _glassBox(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('ສະຖານະ', style: sans(size: 12, color: AppColors.muted)),
-                          const SizedBox(height: 8),
-                          _statusPills(),
-                        ],
-                      ),
-                    ),
-                    if (_status == SaleStatus.sold) ...[
-                      gap,
-                      InkWell(
-                        borderRadius: BorderRadius.circular(22),
-                        onTap: _pickDate,
-                        child: _glassBox(
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('ວັນທີຂາຍ', style: sans(size: 12, color: AppColors.muted)),
-                                    const SizedBox(height: 4),
-                                    Text(fmtDate(_soldAt ?? DateTime.now()), style: sans(size: 17)),
-                                  ],
-                                ),
-                              ),
-                              const Icon(Icons.event_rounded, color: AppColors.muted),
-                            ],
-                          ),
                         ),
                       ),
                     ],
-                    gap,
-                    _glassBox(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('ຊ່ອງທາງຂາຍ', style: sans(size: 12, color: AppColors.muted)),
-                          TextFormField(
-                            controller: _channel,
-                            style: sans(size: 17),
-                            cursorColor: AppColors.butter,
-                            decoration: _bare(),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              for (final c in _channels)
-                                ActionChip(
-                                  label: Text(c, style: sans(size: 13, color: AppColors.muted)),
-                                  backgroundColor: AppColors.glass,
-                                  side: const BorderSide(color: AppColors.line),
-                                  shape: const StadiumBorder(),
-                                  visualDensity: VisualDensity.compact,
-                                  onPressed: () => setState(() => _channel.text = c),
-                                ),
-                            ],
-                          ),
-                        ],
+                    if (!isEdit)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 14, 8, 0),
+                        child: Text('ຂໍ້ມູນການຂາຍ (ລາຄາ, ຜູ້ຊື້, ຮັບເງິນ, ໝາຍເຫດ) ໃສ່ຕອນກົດ "ຂາຍ" ຫຼັງຈາກບັນທຶກແລ້ວ.', style: sans(size: 13, color: AppColors.faint)),
                       ),
-                    ),
-                    gap,
-                    _field('ຜູ້ຊື້', _buyer),
-                    gap,
-                    _glassBox(
-                      padding: const EdgeInsets.fromLTRB(18, 8, 12, 8),
-                      child: Row(
-                        children: [
-                          Expanded(child: Text('ຮັບເງິນແລ້ວ', style: sans(size: 16))),
-                          Switch(
-                            value: _paid,
-                            onChanged: (v) => setState(() => _paid = v),
-                            thumbColor: const WidgetStatePropertyAll(Colors.white),
-                            trackColor: WidgetStateProperty.resolveWith(
-                              (s) => s.contains(WidgetState.selected) ? AppColors.magenta : const Color(0x29FFFFFF),
-                            ),
-                            trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
-                          ),
-                        ],
-                      ),
-                    ),
-                    gap,
-                    _field('ໝາຍເຫດ', _note, maxLines: 3, hint: 'ເລເວນ, ສກິນ, ເງື່ອນໄຂການຮັບປະກັນ…'),
                   ],
                 ),
               ),
@@ -474,32 +423,7 @@ class _SaleFormSheetState extends State<SaleFormSheet> {
             top: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xEB08070B),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: AppColors.line),
-                ),
-                child: Row(
-                  children: [
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.magenta,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(0, 56),
-                        padding: const EdgeInsets.symmetric(horizontal: 38),
-                        shape: const StadiumBorder(),
-                      ),
-                      onPressed: _saving ? null : _save,
-                      child: Text('ບັນທຶກ', style: sans(size: 17, weight: FontWeight.w600, color: Colors.white)),
-                    ),
-                    const Spacer(),
-                    Text('›››', style: sans(size: 26, color: AppColors.faint, letterSpacing: -2)),
-                    const SizedBox(width: 22),
-                  ],
-                ),
-              ),
+              child: SlideToSave(label: 'ເລື່ອນເພື່ອບັນທຶກ', busy: _saving, onConfirm: _save),
             ),
           ),
         ],
