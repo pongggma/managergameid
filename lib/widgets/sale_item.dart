@@ -7,13 +7,29 @@ import 'ui.dart';
 
 /// One account as a dark rounded card: round badge, name, status and profit.
 class SaleItem extends StatelessWidget {
-  const SaleItem({super.key, required this.sale, required this.currency, required this.onTap, this.logoUrl, this.logoLoading = false});
+  const SaleItem({super.key, required this.sale, required this.currency, required this.onTap, required this.onDelete, this.logoUrl, this.logoLoading = false});
 
   final Sale sale;
   final String currency;
   final VoidCallback onTap;
+  final Future<void> Function() onDelete;
   final String? logoUrl;
   final bool logoLoading;
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('ລຶບລາຍການນີ້?'),
+        content: Text('${sale.game}${sale.accountId.isNotEmpty ? ' · ${sale.accountId}' : ''}'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('ຍົກເລີກ')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('ລຶບ')),
+        ],
+      ),
+    );
+    if (ok == true) await onDelete();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +103,13 @@ class SaleItem extends StatelessWidget {
                   const SizedBox(height: 6),
                   AmountText(amountValue, currency, signed: sold, size: 15, weight: FontWeight.w600, color: amountColor),
                 ],
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                tooltip: 'ລຶບໄອດີ',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _confirmDelete(context),
+                icon: const Icon(Icons.delete_outline_rounded, color: AppColors.loss),
               ),
             ],
           ),

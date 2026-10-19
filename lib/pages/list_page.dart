@@ -97,6 +97,7 @@ class _ListPageState extends State<ListPage> {
             currency: store.currency,
             logoUrl: store.logoUrl(s.game), logoLoading: store.logoLoading(s.game),
             onTap: () => widget.onOpenDetail(s),
+            onDelete: () => store.remove(s.id),
           );
         },
       );

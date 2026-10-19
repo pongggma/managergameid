@@ -214,7 +214,7 @@ class _OverviewPageState extends State<OverviewPage> {
           _empty()
         else
           for (final s in recent) ...[
-            SaleItem(sale: s, currency: cur, logoUrl: store.logoUrl(s.game), logoLoading: store.logoLoading(s.game), onTap: () => widget.onOpenDetail(s)),
+            SaleItem(sale: s, currency: cur, logoUrl: store.logoUrl(s.game), logoLoading: store.logoLoading(s.game), onTap: () => widget.onOpenDetail(s), onDelete: () => store.remove(s.id)),
             const SizedBox(height: 12),
           ],
       ],
