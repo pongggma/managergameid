@@ -1,180 +1,169 @@
 # Game ID Ledger (ບັນຊີໄອດີເກມ)
 
-A Flutter app for people who buy and sell game accounts. It is a personal ledger, not a storefront: you record each account you hold, what it cost, what it sold for, who paid, and the app works out profit for you.
+ແອັບ Flutter ສຳລັບຄົນທີ່ຊື້-ຂາຍໄອດີເກມ. ເປັນສະໝຸດບັນຊີສ່ວນຕົວ ບໍ່ແມ່ນຮ້ານຂາຍ: ບັນທຶກໄອດີທີ່ມີ, ຕົ້ນທຶນ, ລາຄາຂາຍ, ຜູ້ຊື້, ການຮັບເງິນ ແລ້ວແອັບຄິດກຳໄລໃຫ້. ລ໊ອກອິນເພື່ອໃຫ້ຂໍ້ມູນດຽວກັນໃນທຸກເຄື່ອງ.
 
-Lao version of this file: [README.lo.md](README.lo.md)
+English version: [README.md](README.md)
 
-## Features
+## ຟີເຈີ
 
-- **One record per game account**: game, account ID, email, password, status, cost, price, sales channel, buyer, paid flag, sold date, note.
-- **Only the game name is required.** ID, email and password are optional because some games have no email or password.
-- **Automatic profit and ROI**: `profit = price - cost`, `ROI = profit / cost x 100` (hidden when cost is 0).
-- **Overview page**: net profit (all time or this month), ROI chip, quick shortcuts, 6-month profit chart with an average line, key figures, latest 5 accounts.
-- **All IDs page**: search by game, ID, email, buyer, channel or note; filter chips with live counts (All, In stock, Reserved, Sold, Unpaid).
-- **Detail sheet**: tap any card to see everything. Email and password can be revealed and copied with one tap.
-- **Add / edit sheet**: cost and price cards with a live profit preview, status pills, sold-date picker, channel quick chips, paid switch.
-- **Settings**: currency symbol (LAK, THB, USD), copy all data as CSV, remove demo data.
-- **Offline**: everything is stored on the device.
-- **Lao UI** with a dark, night-sky look (warm brown to violet background, magenta and butter-yellow accents).
+**ບັນຊີລາຍການ**
+- **ເພີ່ມກ່ອນ ຂາຍທີຫຼັງ.** ຟອມເພີ່ມມີສະເພາະ ເກມ, ໄອດີ, ອີເມລ, ລະຫັດຜ່ານ, ຕົ້ນທຶນ ແລະ ສະຖານະ (ພ້ອມຂາຍ / ຈອງແລ້ວ). ລາຄາຂາຍ, ວັນທີ, ຊ່ອງທາງ, ຜູ້ຊື້, ຮັບເງິນ ແລະ ໝາຍເຫດ ໃສ່ຕອນກົດປຸ່ມ **ຂາຍ** ທີ່ເປີດໜ້າຂາຍ. ໄອດີທີ່ຂາຍແລ້ວແກ້ໄຂໄດ້ ຫຼື ຍົກເລີກການຂາຍກັບໄປພ້ອມຂາຍ.
+- **ບັງຄັບສະເພາະຊື່ເກມ.** ໄອດີ, ອີເມລ, ລະຫັດຜ່ານ ບໍ່ບັງຄັບ ເພາະບາງເກມບໍ່ມີ.
+- **ຈື່ເກມ ແລະ ຊ່ອງທາງ.** ເກມທີ່ເຄີຍໃຊ້ຂຶ້ນເປັນ chip ພ້ອມໂລໂກ້ໃຕ້ຊ່ອງເກມ ກົດເລືອກໄດ້ ບໍ່ຕ້ອງພິມ. ຊ່ອງທາງຂາຍກໍເຊັ່ນກັນ.
+- **ໂລໂກ້ເກມຈາກ API.** ຄົ້ນຫາຕາມຊື່ເກມ (iTunes Search API ບໍ່ຕ້ອງໃຊ້ key) ແລ້ວເກັບໄວ້. ເກມທີ່ບໍ່ພົບຈະສະແດງໄອຄອນຕົວອັກສອນ. ຕອນກຳລັງໂຫຼດໄອຄອນຈະກະພິບ.
+- **ຄິດກຳໄລ ແລະ ROI ອັດຕະໂນມັດ**: `ກຳໄລ = ລາຄາຂາຍ - ຕົ້ນທຶນ`, `ROI = ກຳໄລ / ຕົ້ນທຶນ x 100` (ບໍ່ສະແດງຖ້າຕົ້ນທຶນເປັນ 0).
+- **ເລື່ອນເພື່ອບັນທຶກ**: ຟອມເພີ່ມ ແລະ ຟອມຂາຍຢືນຢັນດ້ວຍການເລື່ອນວົງມົນໄປສຸດ.
 
-## Requirements
+**ພາບລວມ**
+- ກຳໄລສຸດທິ (ທັງໝົດ ຫຼື ເດືອນນີ້), ROI, ທາງລັດ, ຕົວເລກສຳຄັນ, 5 ລາຍການຫຼ້າສຸດ.
+- **ຊາດກຳໄລ** ເລືອກໄດ້ 3 ຊ່ວງ: **1 ອາທິດ** (7 ວັນຫຼ້າສຸດ), **1 ເດືອນ** (30 ວັນຫຼ້າສຸດ), **1 ປີ** (12 ເດືອນຫຼ້າສຸດ). ແຕະ ຫຼື ລາກຜ່ານແທ່ງເພື່ອເຫັນຊ່ວງເຕັມ, ກຳໄລ ແລະ ຈຳນວນໄອດີທີ່ຂາຍ. ມີ 3 ກ່ອງສະຫຼຸບ: ລວມ, ສະເລ່ຍ, ດີທີ່ສຸດ.
 
-| Tool | Version |
+**ສະກຸນເງິນ**
+- ກີບ (LAK), ບາດ (THB), ໂດລາ (USD). ເມື່ອປ່ຽນ **ຕົ້ນທຶນ ແລະ ລາຄາຂາຍທັງໝົດຖືກແປງ** ຕາມອັດຕາແລກປ່ຽນຂອງມື້ນີ້ (open.er-api.com ບໍ່ຕ້ອງໃຊ້ key). ປັດເສດ (USD ມີ 2 ຕຳແໜ່ງ, ອື່ນໆເປັນຕົວເລກເຕັມ) ຈຶ່ງປ່ຽນໄປມາຫຼາຍເທື່ອອາດຄາດເຄື່ອນເລັກນ້ອຍ. ຖ້າດຶງອັດຕາບໍ່ໄດ້ ຈະບໍ່ປ່ຽນຫຍັງ.
+
+**ບັນຊີ ແລະ ຊິງຄ໌**
+- **ລ໊ອກອິນ** ດ້ວຍ Google, Facebook ຫຼື ອີເມລ + ລະຫັດຜ່ານ (Firebase Authentication). ບັນຊີອີເມລຕ້ອງ **ຢືນຢັນອີເມລ** ກ່ອນເຂົ້າແອັບ ໜ້າຢືນຢັນກວດເອງ ແລະ ສົ່ງອີເມລຊ້ຳໄດ້.
+- **ໂໝດບໍ່ເຂົ້າສູ່ລະບົບ** ເກັບໃນເຄື່ອງເທົ່ານັ້ນ.
+- **ຊິງຄ໌ຄລາວ** (Cloud Firestore): ບັນຊີທີ່ລ໊ອກອິນເກັບຂໍ້ມູນຂຶ້ນຄລາວ ເຂົ້າຈາກເຄື່ອງອື່ນກໍເຫັນຂໍ້ມູນດຽວກັນ. ອອບລາຍໄດ້ ແລະ ຊິງຄ໌ເອງເມື່ອມີເນັດ. ໃນຕັ້ງຄ່າມີປ້າຍບອກສະຖານະ.
+- **ໂປຣໄຟລ໌**: ເລືອກຕົວລະຄອນ 6 ຕົວ (ນັກຮົບ, ນັກເວດ, ນິນຈາ, ຫຸ່ນຍົນ, ຈິ້ງຈອກ, ມັງກອນນ້ອຍ) ແລະ ແກ້ຊື່ທີ່ສະແດງໄດ້. ບໍ່ຮອງຮັບການອັບໂຫຼດຮູບເອງ ຕາມທີ່ອອກແບບ.
+
+**ການແຈ້ງເຕືອນ**
+- **Popup** ສະຫວຍໆ ສຳລັບຜົນລັບ ແລະ ຄຳຖາມ (ສຳເລັດ, ຜິດພາດ, ເຕືອນ, ແຈ້ງ; ລຶບ ແລະ ປ່ຽນສະກຸນເງິນມີໜ້າຢືນຢັນ).
+- **ແອນິເມຊັນໂຫຼດ** ຕອນເຮັດວຽກກັບເນັດ ແລະ ຂຶ້ນຂໍ້ຄວາມ "ເນັດຊ້າ" ຫຼັງ 4 ວິນາທີ. ຖ້າເນັດ ຫຼື API ມີບັນຫາ ຈະມີ popup ພ້ອມປຸ່ມ **ລອງໃໝ່**.
+
+**ຮູບແບບ**: ສີມືດ ແບບທ້ອງຟ້າກາງຄືນ (ພື້ນນ້ຳຕານ-ມ່ວງ, ສີເນັ້ນ magenta ແລະ ເຫຼືອງ), ພາສາລາວ, ໜ້າຕ່າງລຸ່ມເບລອພື້ນຫຼັງ.
+
+## ຄວາມຕ້ອງການ
+
+| ເຄື່ອງມື | ເວີຊັນ |
 | --- | --- |
-| Flutter | 3.22 or newer |
-| Dart | 3.4 or newer |
+| Flutter | 3.22 ຂຶ້ນໄປ |
+| Dart | 3.4 ຂຶ້ນໄປ |
+| Android | minSdk 23 ຂຶ້ນໄປ (Firebase) |
 
-Dependencies (already in `pubspec.yaml`):
-
-| Package | Used for |
+| Package | ໃຊ້ເພື່ອ |
 | --- | --- |
-| `firebase_core` | Initialize Firebase on configured mobile platforms |
-| `firebase_auth` | Email/password and federated sign-in through Firebase Auth |
-| `google_sign_in` | Google sign-in on Android/iOS |
-| `flutter_facebook_auth` | Optional Facebook sign-in on Android/iOS |
-| `shared_preferences` ^2.2.3 | Saving the ledger on the device |
-| `google_fonts` ^6.2.1 | Plus Jakarta Sans and IBM Plex Mono |
+| `shared_preferences` | ສຳເນົາຂໍ້ມູນໃນເຄື່ອງ, ຂໍ້ມູນ guest, ຕັ້ງຄ່າ |
+| `google_fonts` | ຟອນ Plus Jakarta Sans ແລະ IBM Plex Mono |
+| `http` | ໂລໂກ້ເກມ ແລະ ອັດຕາແລກປ່ຽນ |
+| `firebase_core`, `firebase_auth` | ລ໊ອກອິນ |
+| `cloud_firestore` | ຊິງຄ໌ຄລາວ |
+| `google_sign_in`, `flutter_facebook_auth` | ລ໊ອກອິນ Google ແລະ Facebook |
 
-## Getting started
+## ເລີ່ມໃຊ້ງານ
 
-1. Create an empty Flutter project (skip if you already have one):
+```bash
+flutter pub get
+flutter run
+```
 
-   ```bash
-   flutter create game_id_ledger
-   cd game_id_ledger
+ຖ້າຍັງບໍ່ຕັ້ງຄ່າ Firebase ແອັບກໍຍັງໃຊ້ໄດ້ໃນໂໝດບໍ່ເຂົ້າສູ່ລະບົບ. ເປີດຄັ້ງທຳອິດບັນຊີວ່າງ ກົດ **ລອງໃສ່ຂໍ້ມູນຕົວຢ່າງ** ເພື່ອເບິ່ງ (ລຶບໄດ້ໃນຕັ້ງຄ່າ).
+
+## ຕັ້ງຄ່າ Firebase (ລ໊ອກອິນ ແລະ ຊິງຄ໌)
+
+Google ແລະ Facebook ໃຊ້ໄດ້ສະເພາະ **Android ແລະ iOS**. ອີເມລ + ລະຫັດຜ່ານ ແລະ Firestore ໃຊ້ໄດ້ທຸກແພລດຟອມທີ່ຕັ້ງຄ່າ Firebase ແລ້ວ. ແພລດຟອມອື່ນໃຊ້ໂໝດບໍ່ເຂົ້າສູ່ລະບົບ.
+
+1. ສ້າງໂປຣເຈັກທີ່ <https://console.firebase.google.com>.
+2. **Authentication > Sign-in method**: ເປີດ **Email/Password** ແລະ **Google** / **Facebook** ຖ້າຢາກໃຊ້.
+3. **ແອັບ Android**: ເພີ່ມແອັບດ້ວຍ `applicationId` (ເບິ່ງ `android/app/build.gradle.kts`), ເພີ່ມ SHA-1 (debug: `keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android -keypass android`; ຖ້າສ້າງ release ເພີ່ມ SHA-1 ຂອງ keystore release ນຳ), ດາວໂຫຼດ `google-services.json` ໃສ່ `android/app/`.
+4. **Gradle**: ເພີ່ມ plugin `com.google.gms.google-services` ໃນ `android/settings.gradle(.kts)` (ເວີຊັນ `4.4.2`, `apply false`) ແລະ `android/app/build.gradle(.kts)`. ຕັ້ງ `minSdk` ເປັນ 23 ຂຶ້ນໄປ.
+5. **iOS**: ໃສ່ `GoogleService-Info.plist` ໃນ `ios/Runner/` ແລະ ເພີ່ມ `REVERSED_CLIENT_ID` ເປັນ URL scheme.
+6. **Facebook**: ສ້າງແອັບທີ່ <https://developers.facebook.com>, ເອົາ App ID ແລະ secret ໃສ່ Firebase, ເພີ່ມ redirect URI ຂອງ Firebase ໃນແອັບ Facebook, ແລ້ວເພີ່ມ `facebook_app_id`, `fb_login_protocol_scheme`, `facebook_client_token` ຕາມ [ເອກະສານ flutter_facebook_auth](https://facebook.meedu.app/docs/7.x.x/android).
+7. **Firestore**: **Firestore Database > Create database** ແລ້ວແຖບ **Rules**:
+
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{uid}/{document=**} {
+         allow read, write: if request.auth != null && request.auth.uid == uid;
+       }
+     }
+   }
    ```
 
-2. Copy `pubspec.yaml` and the `lib/` folder from this project over the ones in your new project.
+ໂຄງສ້າງ Firestore: `users/{uid}/sales/{saleId}` (ໜຶ່ງເອກະສານຕໍ່ໜຶ່ງໄອດີ) ແລະ `users/{uid}/meta/prefs` (ສະກຸນເງິນ, ເກມ, ຊ່ອງທາງ, ອັດຕາຫຼ້າສຸດ).
 
-3. Install packages and run:
+## ສ້າງ APK release
 
-   ```bash
-   flutter pub get
-   flutter run
-   ```
+```bash
+flutter clean
+flutter pub get
+flutter build apk --release                 # build/app/outputs/flutter-apk/app-release.apk
+flutter build apk --release --split-per-abi # ໄຟລ໌ນ້ອຍແຍກຕາມ CPU
+flutter build appbundle --release           # ສຳລັບ Google Play
+```
 
-4. **Android release builds:** `google_fonts` downloads fonts at runtime, and release builds need the internet permission. Add this line inside `<manifest>` in `android/app/src/main/AndroidManifest.xml`:
+ກ່ອນສ້າງ release: ເພີ່ມ SHA-1 ຂອງ release ໃນ Firebase (ບໍ່ດັ່ງນັ້ນ Google login ຂຶ້ນ error 10), ສ້າງ keystore ແລະ ຕັ້ງການເຊັນ (ເບິ່ງ <https://docs.flutter.dev/deployment/android>), ຢ່າ push `android/key.properties` ແລະ `*.jks` ຂຶ້ນ git, ກວດວ່າມີ `android.permission.INTERNET` ໃນ `AndroidManifest.xml`, ແລະ ເພີ່ມເລກ build ໃນ `pubspec.yaml` (`version: 1.1.0+3`).
 
-   ```xml
-   <uses-permission android:name="android.permission.INTERNET"/>
-   ```
+## ວິທີຄິດຕົວເລກ
 
-   Debug builds already have it. iOS needs no change.
-
-On first launch the ledger is empty. Tap **Try demo data** to see the app filled in; demo rows carry a "ຕົວຢ່າງ" (example) label and can be removed from Settings.
-
-## Firebase Login (Android)
-
-The app already includes Firebase Authentication screens for email/password, Google, Facebook, and guest access. To enable Firebase on Android:
-
-1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/) and enable **Authentication → Sign-in method → Email/Password**. Enable Google only if you intend to use Google login; Facebook also needs a Facebook Developer app and is optional.
-2. Add an Android app in Firebase with the application ID from `android/app/build.gradle.kts` (`com.example.managerid` in this checkout). Keep this ID unchanged in Firebase unless you also change `applicationId` in Gradle. For Google login, add the debug SHA-1 from `keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android -keypass android`.
-3. Download `google-services.json` into `android/app/google-services.json`. Download it again after adding SHA-1 so it includes the updated OAuth client.
-4. Run `flutter pub get`, then `flutter run` on Android. Register at least one account in the app and confirm it appears under Firebase Authentication → Users.
-
-The project includes Firebase options for Android, Web, and Windows. Email/password can use Firebase Auth on those configured targets. Google and Facebook sign-in in this app are available on Android/iOS only. Firebase's Windows support is intended for local development rather than production; see the [FlutterFire setup guide](https://firebase.google.com/docs/flutter/setup).
-
-Do not commit a real Facebook app secret or service-account credentials. The Android `google-services.json` contains client configuration, not a service-account private key.
-
-## How the numbers are calculated
-
-| Figure | Rule |
+| ຕົວເລກ | ກົດ |
 | --- | --- |
-| Profit of one account | `price - cost` |
-| Net profit | Sum of profit for accounts with status **Sold**. "This month" only counts accounts whose sold date is in the current month. |
-| ROI chip | Net profit divided by the cost of the sold accounts in the same period |
-| In stock | Accounts that are not sold (In stock + Reserved), with the sum of their cost |
-| Unpaid | Sold accounts where "Paid" is off, with the sum of their price |
-| Average profit per ID | Net profit divided by the number of sold accounts in the period |
-| Monthly chart | Profit of sold accounts grouped by sold month, last 6 months; the dashed line is the 6-month average |
+| ກຳໄລຕໍ່ໄອດີ | `ລາຄາຂາຍ - ຕົ້ນທຶນ` |
+| ກຳໄລສຸດທິ | ຜົນລວມກຳໄລຂອງໄອດີທີ່ **ຂາຍແລ້ວ**. "ເດືອນນີ້" ນັບສະເພາະທີ່ຂາຍໃນເດືອນປັດຈຸບັນ. |
+| ROI | ກຳໄລສຸດທິ ຫານ ຕົ້ນທຶນຂອງໄອດີທີ່ຂາຍໃນຊ່ວງດຽວກັນ |
+| ໃນສະຕັອກ | ໄອດີທີ່ຍັງບໍ່ຂາຍ (ພ້ອມຂາຍ + ຈອງແລ້ວ) ພ້ອມຜົນລວມຕົ້ນທຶນ |
+| ຄ້າງຈ່າຍ | ໄອດີທີ່ຂາຍແລ້ວແຕ່ຍັງບໍ່ໄດ້ຮັບເງິນ ພ້ອມຜົນລວມລາຄາຂາຍ |
+| ກຳໄລສະເລ່ຍຕໍ່ໄອດີ | ກຳໄລສຸດທິ ຫານ ຈຳນວນໄອດີທີ່ຂາຍໃນຊ່ວງນັ້ນ |
+| ຊາດກຳໄລ | ກຳໄລຂອງໄອດີທີ່ຂາຍແລ້ວ ຈັດຕາມວັນຂາຍ: ລາຍວັນ ສຳລັບ 1 ອາທິດ / 1 ເດືອນ, ລາຍເດືອນ ສຳລັບ 1 ປີ. ເສັ້ນປະແມ່ນຄ່າສະເລ່ຍຂອງແທ່ງທີ່ສະແດງ. |
 
-Changing the currency in Settings only changes the symbol shown. It does not convert amounts.
+## ຂໍ້ມູນ ແລະ ຄວາມເປັນສ່ວນຕົວ
 
-## Data and privacy
+- **ໂໝດບໍ່ເຂົ້າສູ່ລະບົບ**: ຂໍ້ມູນຢູ່ໃນ `shared_preferences` ຂອງເຄື່ອງ (key `game-id-ledger-v1`).
+- **ລ໊ອກອິນແລ້ວ**: ເກັບສຳເນົາໃນເຄື່ອງແຍກຕາມບັນຊີ (`game-id-ledger-v1-<uid>`) ແລະ ຊິງຄ໌ຂຶ້ນ Firestore.
+- **ອີເມລ ແລະ ລະຫັດຜ່ານຂອງໄອດີເກມ ເກັບແບບບໍ່ເຂົ້າລະຫັດ** ທັງໃນເຄື່ອງ ແລະ ໃນ Firestore. ກົດຄວາມປອດໄພກັນຜູ້ໃຊ້ອື່ນອ່ານ ແຕ່ຄົນທີ່ເຂົ້າເຖິງເຄື່ອງ ຫຼື ໂປຣເຈັກ Firebase ເຫັນໄດ້. ບັນທຶກສະເພາະທີ່ຍອມຮັບຄວາມສ່ຽງໄດ້. ຖ້າຢາກເສີມຄວາມປອດໄພ ໃຫ້ເຂົ້າລະຫັດຊ່ອງ `password` ກ່ອນບັນທຶກ ຫຼື ໃຊ້ [`flutter_secure_storage`](https://pub.dev/packages/flutter_secure_storage).
+- CSV (ຕັ້ງຄ່າ) ມີທຸກຊ່ອງ **ຍົກເວັ້ນລະຫັດຜ່ານ**.
+- ຂໍ້ມູນໂໝດບໍ່ເຂົ້າສູ່ລະບົບບໍ່ຍ້າຍເຂົ້າບັນຊີຄລາວອັດຕະໂນມັດ.
+- ລຶບແອັບ ຂໍ້ມູນໃນເຄື່ອງຫາຍ ແຕ່ຂໍ້ມູນໃນຄລາວຍັງຢູ່ໃນບັນຊີ.
 
-- All data lives in the device's `shared_preferences` under the key `game-id-ledger-v1`, as one JSON document:
-
-  ```json
-  {
-    "currency": "LAK",
-    "sales": [
-      {
-        "id": "...",
-        "game": "Free Fire",
-        "accountId": "FF-48210937",
-        "email": "",
-        "password": "",
-        "status": "sold",
-        "cost": 180000,
-        "price": 350000,
-        "channel": "Facebook",
-        "buyer": "@someone",
-        "paid": true,
-        "soldAt": "2026-10-10",
-        "note": "",
-        "createdAt": "2026-10-08T09:30:00.000",
-        "demo": false
-      }
-    ]
-  }
-  ```
-
-- **Emails and passwords are stored unencrypted.** Anyone with access to the unlocked device or its backup may read them. Only record credentials you accept that risk for. To harden this, move the `password` field to [`flutter_secure_storage`](https://pub.dev/packages/flutter_secure_storage).
-- CSV export (Settings) includes every field **except the password**.
-- Uninstalling the app deletes the data. There is no cloud backup or sync.
-
-## Project structure
+## ໂຄງສ້າງໂປຣເຈັກ
 
 ```
 lib/
-  main.dart                        App entry, floating tab bar, three pages
-  theme/app_theme.dart             Colours, fonts, night-sky background
-  models/sale.dart                 Sale model and status enum
-  data/sale_store.dart             Storage, queries, summary, monthly profit, CSV, demo data
+  main.dart                      ຈຸດເລີ່ມ, ດ່ານລ໊ອກອິນ, ໜ້າຫຼັກ, ແຖບເມນູລອຍ
+  firebase_options.dart          ຄ່າ Firebase (ສ້າງອັດຕະໂນມັດ)
+  theme/app_theme.dart           ສີ, ຟອນ, ພື້ນຫຼັງ
+  models/sale.dart               ໂມເດວລາຍການ ແລະ ສະຖານະ
+  data/sale_store.dart           ເກັບໃນເຄື່ອງ, ຊິງຄ໌ Firestore, ຄິວຣີ, ສະຫຼຸບ, ຂໍ້ມູນຊາດ, CSV, ແປງສະກຸນເງິນ
+  services/
+    auth_service.dart            ລ໊ອກອິນ Google / Facebook / ອີເມລ, ຢືນຢັນອີເມລ, ຊື່ ແລະ ຮູບໂປຣໄຟລ໌
+    exchange_rate.dart           ອັດຕາແລກປ່ຽນ
+    game_logo.dart               ຄົ້ນຫາໂລໂກ້ເກມ
   pages/
-    overview_page.dart             Hero profit, shortcuts, chart, key figures, latest accounts
-    list_page.dart                 Search, filter chips, account cards
-    settings_page.dart             Currency, CSV, demo data
+    login_page.dart              ເຂົ້າສູ່ລະບົບ / ສະໝັກ
+    verify_email_page.dart       ໜ້າຢືນຢັນອີເມລ
+    overview_page.dart           ພາບລວມ
+    list_page.dart               ໄອດີທັງໝົດ
+    settings_page.dart           ຕັ້ງຄ່າ
   widgets/
-    sale_item.dart                 Account card
-    sale_detail_sheet.dart         Detail sheet (reveal / copy credentials, delete)
-    sale_form_sheet.dart           Add / edit sheet
-    profit_chart.dart              Monthly profit chart (CustomPainter)
-    ui.dart                        Shared pieces: amount text, chips, panels, sheet frame
-  utils/format.dart                Money, dates, chart ticks, game badge colours
+    sale_form_sheet.dart         ເພີ່ມ / ແກ້ໄຂໄອດີ
+    sale_sell_sheet.dart         ຂາຍ / ແກ້ໄຂການຂາຍ
+    sale_detail_sheet.dart       ລາຍລະອຽດ
+    sale_item.dart               ບັດລາຍການ
+    profit_chart.dart            ຊາດກຳໄລ
+    avatar.dart                  ຕົວລະຄອນ 6 ຕົວ ແລະ ໜ້າແກ້ໄຂໂປຣໄຟລ໌
+    popup.dart                   Popup, ໜ້າຢືນຢັນ, ແອນິເມຊັນໂຫຼດ
+    ui.dart                      ສ່ວນປະກອບທົ່ວໄປ, ປຸ່ມເລື່ອນເພື່ອບັນທຶກ
+  utils/format.dart              ເງິນ, ວັນທີ, ຕົວຊ່ວຍຊາດ
 ```
 
-State is held in one `SaleStore` (a `ChangeNotifier`) created in `main()` and passed down; screens rebuild through `ListenableBuilder`. There is no other state-management package.
+## ຂໍ້ຈຳກັດ
 
-## Design tokens
+- ໂລໂກ້ເກມມາຈາກ iTunes Search API ເຊິ່ງຄຸມສ່ວນໃຫຍ່ເກມມືຖື; ເກມ PC ບາງເກມອາດສະແດງໄອຄອນຕົວອັກສອນ.
+- ການປ່ຽນສະກຸນເງິນແປງ ແລະ ປັດເສດຖາວອນ.
+- ສອງເຄື່ອງແກ້ໄອດີດຽວກັນພ້ອມກັນ: ອັນທີ່ບັນທຶກຫຼັງຊະນະ.
+- CSV ຄັດລອກເປັນຂໍ້ຄວາມໃສ່ clipboard ບໍ່ມີການສົ່ງອອກເປັນໄຟລ໌ ຫຼື ນຳເຂົ້າ.
+- ຍັງບໍ່ມີ test ອັດຕະໂນມັດ.
 
-Change the look in one place: `lib/theme/app_theme.dart`.
+## ແຜນຕໍ່ໄປ
 
-| Token | Value | Use |
-| --- | --- | --- |
-| `AppColors.page` | `#08070B` | Page background base |
-| `AppColors.magenta` | `#FF14F0` | Primary buttons, selected chips, centre "+" button |
-| `AppColors.butter` | `#EBD86A` | Gains, percentage chip, current month bar |
-| `AppColors.loss` | `#FF7F9E` | Losses and unpaid warnings |
-| `AppColors.muted` / `faint` | `#A39CAD` / `#756E80` | Secondary text |
+- ເຂົ້າລະຫັດຊ່ອງລະຫັດຜ່ານກ່ອນບັນທຶກ/ຊິງຄ໌ ແລະ ລ໊ອກແອັບ (PIN ຫຼື ລາຍນິ້ວມື)
+- ຍ້າຍຂໍ້ມູນໂໝດບໍ່ເຂົ້າສູ່ລະບົບເຂົ້າບັນຊີຄລາວ
+- ນຳເຂົ້າ CSV ແລະ ສົ່ງອອກເປັນໄຟລ໌
+- ສະຫຼຸບກຳໄລແຍກຕາມເກມ ແລະ ຊ່ອງທາງ
+- ແຈ້ງເຕືອນໄອດີທີ່ຈອງແລ້ວແຕ່ຍັງຄ້າງຈ່າຍ
 
-Fonts: Plus Jakarta Sans for Latin text and numbers, IBM Plex Mono for IDs, emails and passwords. Lao text uses the phone's own Lao font (Noto Sans Lao on Android, Lao Sangam MN on iOS). To work without internet on first launch, bundle the font files under `assets/` and declare them in `pubspec.yaml`.
+## ໃບອະນຸຍາດ
 
-## Known limitations
-
-- Data is local to one device; no sync, no cloud backup, no CSV import.
-- CSV export copies text to the clipboard (paste into Google Sheets or Excel); it does not save a file.
-- The monthly chart always shows the last 6 months.
-- No automated tests yet.
-
-## Ideas for later
-
-- Encrypted storage for credentials, with an app lock (PIN or biometrics)
-- CSV import and file export
-- Cloud sync (for example Firebase) so several devices share one ledger
-- Per-game and per-channel profit breakdown
-- Reminders for reserved accounts that are still unpaid
-
-## License
-
-No license has been chosen yet. Add one (for example MIT) before publishing the code.
+ຍັງບໍ່ໄດ້ເລືອກໃບອະນຸຍາດ. ເພີ່ມ (ເຊັ່ນ MIT) ກ່ອນເຜີຍແພ່ໂຄ້ດ.

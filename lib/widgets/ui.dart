@@ -122,14 +122,20 @@ class StatusTag extends StatelessWidget {
 
 /// Round game badge with initials on a coloured disc.
 class Coin extends StatelessWidget {
-  const Coin(this.game, {super.key, this.size = 60, this.logoUrl});
+  const Coin(this.game, {super.key, this.size = 60, this.logoUrl, this.loading = false});
 
   final String game;
   final double size;
   final String? logoUrl;
 
+  /// True while the logo is being looked up: the badge pulses.
+  final bool loading;
+
   @override
   Widget build(BuildContext context) {
+    if (loading && (logoUrl == null || logoUrl!.isEmpty)) {
+      return _Pulse(child: Coin(game, size: size, logoUrl: logoUrl));
+    }
     final url = logoUrl;
     if (url != null && url.isNotEmpty) {
       return Container(
@@ -519,4 +525,29 @@ class _SlideToSaveState extends State<SlideToSave> with SingleTickerProviderStat
       );
     });
   }
+}
+
+
+/// Gently fades its child in and out (used for "loading" placeholders).
+class _Pulse extends StatefulWidget {
+  const _Pulse({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_Pulse> createState() => _PulseState();
+}
+
+class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      FadeTransition(opacity: Tween(begin: .35, end: 1.0).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)), child: widget.child);
 }

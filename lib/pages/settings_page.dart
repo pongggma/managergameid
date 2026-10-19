@@ -5,6 +5,7 @@ import '../data/sale_store.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/popup.dart';
 import '../widgets/ui.dart';
 
 /// Currency, CSV copy, storage notes and demo data.
@@ -20,6 +21,42 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   SaleStore get store => widget.store;
+
+  Widget _syncBadge() {
+    final st = store.syncStatus;
+    late final IconData icon;
+    late final Color color;
+    late final String text;
+    switch (st) {
+      case SyncStatus.off:
+        icon = Icons.phone_android_rounded;
+        color = AppColors.muted;
+        text = 'ເກັບໃນເຄື່ອງນີ້ເທົ່ານັ້ນ ເຂົ້າສູ່ລະບົບເພື່ອຊິງຄ໌ຫຼາຍເຄື່ອງ';
+      case SyncStatus.syncing:
+        icon = Icons.sync_rounded;
+        color = AppColors.butter;
+        text = 'ກຳລັງຊິງຄ໌ຂໍ້ມູນ…';
+      case SyncStatus.synced:
+        icon = Icons.cloud_done_rounded;
+        color = AppColors.mint;
+        text = 'ຊິງຄ໌ກັບຄລາວແລ້ວ ';
+      case SyncStatus.offline:
+        icon = Icons.cloud_off_rounded;
+        color = AppColors.loss;
+        text = 'ບໍ່ມີອິນເຕີເນັດ ຂໍ້ມູນຈະຊິງຄ໌ເອງເມື່ອມີເນັດ';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(color: color.withOpacity(.1), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withOpacity(.3))),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: sans(size: 13, color: color, height: 1.35))),
+        ],
+      ),
+    );
+  }
 
   Widget _accountCard() {
     final a = widget.auth.account;
@@ -60,6 +97,8 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ],
       ),
+      const SizedBox(height: 12),
+      _syncBadge(),
       const SizedBox(height: 14),
       OutlinedButton(
         style: OutlinedButton.styleFrom(
@@ -88,29 +127,27 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _switch(String code) async {
     if (code == store.currency || _converting) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        backgroundColor: const Color(0xFF1A171F),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: Text('ປ່ຽນເປັນ $code?', style: sans(size: 18, weight: FontWeight.w600)),
-        content: Text('ຕົ້ນທຶນ ແລະ ລາຄາຂາຍທັງໝົດຈະຖືກແປງຕາມອັດຕາແລກປ່ຽນຂອງມື້ນີ້ (${store.currency} → $code).', style: sans(color: AppColors.muted)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text('ຍົກເລີກ', style: sans(color: AppColors.muted))),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.magenta),
-            onPressed: () => Navigator.pop(c, true),
-            child: Text('ປ່ຽນ', style: sans(weight: FontWeight.w600, color: Colors.white)),
-          ),
-        ],
-      ),
+    final ok = await confirmPopup(
+      context,
+      title: 'ປ່ຽນເປັນ $code?',
+      message: 'ຕົ້ນທຶນ ແລະ ລາຄາຂາຍທັງໝົດຈະຖືກແປງຕາມອັດຕາແລກປ່ຽນຂອງມື້ນີ້ (${store.currency} → $code).',
+      confirmLabel: 'ປ່ຽນ',
     );
-    if (ok != true || !mounted) return;
-    setState(() => _converting = true);
-    final err = await store.changeCurrency(code);
-    if (!mounted) return;
-    setState(() => _converting = false);
-    showToast(context, err ?? 'ແປງເປັນ $code ແລ້ວ');
+    if (!ok || !mounted) return;
+    _converting = true;
+    try {
+      while (mounted) {
+        final err = await runWithLoading(context, () => store.changeCurrency(code), message: 'ກຳລັງດຶງອັດຕາແລກປ່ຽນ…');
+        if (!mounted) return;
+        if (err == null) {
+          await successPopup(context, 'ແປງເປັນ $code ແລ້ວ', message: store.rateNote);
+          return;
+        }
+        if (!await problemPopup(context, message: err)) return; // false = closed
+      }
+    } finally {
+      _converting = false;
+    }
   }
 
   Widget _section(String title, List<Widget> children) {
@@ -165,8 +202,6 @@ class _SettingsPageState extends State<SettingsPage> {
             _currencyPill('THB', '฿ ບາດ'),
             _currencyPill('USD', r'$ ໂດລາ'),
           ]),
-          if (_converting)
-            const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator(color: AppColors.magenta, backgroundColor: AppColors.glass)),
           _note('ເມື່ອປ່ຽນ ຕົວເລກທັງໝົດຈະຖືກແປງຕາມອັດຕາແລກປ່ຽນຂອງມື້ນີ້ (ດຶງຈາກ open.er-api.com ຕ້ອງມີອິນເຕີເນັດ).'),
           if (store.rateNote.isNotEmpty) _note('ອັດຕາຄັ້ງຫຼ້າສຸດ: ${store.rateNote}'),
         ]),
@@ -183,13 +218,13 @@ class _SettingsPageState extends State<SettingsPage> {
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: store.exportCsv()));
               if (!context.mounted) return;
-              showToast(context, 'ຄັດລອກ CSV ແລ້ວ ເອົາໄປວາງໃນ Google Sheets ຫຼື Excel ໄດ້');
+              successPopup(context, 'ຄັດລອກ CSV ແລ້ວ', message: 'ເອົາໄປວາງໃນ Google Sheets ຫຼື Excel ໄດ້');
             },
           ),
           _note('CSV ມີຂໍ້ມູນທຸກຢ່າງ ຍົກເວັ້ນລະຫັດຜ່ານ.'),
         ]),
         _section('ການເກັບຂໍ້ມູນ', [
-          Text('ຂໍ້ມູນເກັບໄວ້ໃນໂທລະສັບເຄື່ອງນີ້ເທົ່ານັ້ນ. ຖ້າລຶບແອັບ ຂໍ້ມູນຈະຫາຍ.', style: sans(size: 14, color: AppColors.muted)),
+          Text(store.syncStatus == SyncStatus.off ? 'ຂໍ້ມູນເກັບໄວ້ໃນໂທລະສັບເຄື່ອງນີ້ເທົ່ານັ້ນ. ຖ້າລຶບແອັບ ຂໍ້ມູນຈະຫາຍ.' : 'ຂໍ້ມູນເກັບໃນເຄື່ອງນີ້ ແລະ ຊິງຄ໌ຂຶ້ນຄລາວຕາມບັນຊີຂອງທ່ານ. ຖ້າລຶບແອັບ ຂໍ້ມູນຍັງຢູ່ໃນຄລາວ.', style: sans(size: 14, color: AppColors.muted)),
           _note('ອີເມລ ແລະ ລະຫັດຜ່ານທີ່ບັນທຶກຍັງບໍ່ໄດ້ເຂົ້າລະຫັດ. ບັນທຶກສະເພາະບັນຊີທີ່ທ່ານຍອມຮັບຄວາມສ່ຽງໄດ້.'),
         ]),
         if (store.hasDemo)

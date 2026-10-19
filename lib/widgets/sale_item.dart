@@ -7,12 +7,13 @@ import 'ui.dart';
 
 /// One account as a dark rounded card: round badge, name, status and profit.
 class SaleItem extends StatelessWidget {
-  const SaleItem({super.key, required this.sale, required this.currency, required this.onTap, this.logoUrl});
+  const SaleItem({super.key, required this.sale, required this.currency, required this.onTap, this.logoUrl, this.logoLoading = false});
 
   final Sale sale;
   final String currency;
   final VoidCallback onTap;
   final String? logoUrl;
+  final bool logoLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +57,7 @@ class SaleItem extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Coin(s.game, logoUrl: logoUrl),
+              Coin(s.game, logoUrl: logoUrl, loading: logoLoading),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(

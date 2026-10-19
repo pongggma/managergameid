@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -51,6 +53,8 @@ class Summary {
   double get average => soldCount == 0 ? 0 : profit / soldCount;
 }
 
+enum SyncStatus { off, syncing, synced, offline }
+
 enum ChartPeriod { week, month, year }
 
 extension ChartPeriodInfo on ChartPeriod {
@@ -71,9 +75,13 @@ class MonthBar {
 
 /// Keeps every sale on the device (SharedPreferences, as one JSON string).
 class SaleStore extends ChangeNotifier {
-  /// [suffix] is empty for guest mode (the original ledger) or the account uid.
-  SaleStore({String suffix = ''}) : _key = suffix.isEmpty ? 'game-id-ledger-v1' : 'game-id-ledger-v1-$suffix';
+  /// [suffix] is empty for guest mode (local only, the original ledger) or the
+  /// account uid (saved on the device AND synced to Cloud Firestore).
+  SaleStore({String suffix = ''})
+      : _uid = suffix,
+        _key = suffix.isEmpty ? 'game-id-ledger-v1' : 'game-id-ledger-v1-$suffix';
 
+  final String _uid;
   final String _key;
 
   SharedPreferences? _prefs;
@@ -106,6 +114,9 @@ class SaleStore extends ChangeNotifier {
     return [t, ...list.where((e) => _k(e) != _k(t))];
   }
 
+  /// True while the icon of [game] is being fetched.
+  bool logoLoading(String game) => _fetching.contains(_k(game));
+
   /// Icon url for a game, or null. Starts a background lookup the first time
   /// a name is seen, and the result is saved so it is not fetched again.
   String? logoUrl(String game) {
@@ -117,7 +128,11 @@ class SaleStore extends ChangeNotifier {
       GameLogoService.find(game).then((url) {
         _fetching.remove(k);
         if (url != null) _logos[k] = url; // failures are not cached, so they retry next launch
-        if (url != null) _persist();
+        if (url != null) {
+          _persist();
+        } else {
+          notifyListeners();
+        }
       });
     }
     return null;
@@ -130,7 +145,11 @@ class SaleStore extends ChangeNotifier {
   Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
     final raw = _prefs!.getString(_key);
-    if (raw == null) return;
+    if (raw != null) _readLocal(raw);
+    _startCloud();
+  }
+
+  void _readLocal(String raw) {
     try {
       final data = jsonDecode(raw) as Map<String, dynamic>;
       final cur = data['currency'] as String?;
@@ -159,6 +178,10 @@ class SaleStore extends ChangeNotifier {
 
   Future<void> _persist() async {
     notifyListeners();
+    await _saveLocal();
+  }
+
+  Future<void> _saveLocal() async {
     await _prefs?.setString(
       _key,
       jsonEncode({
@@ -176,6 +199,109 @@ class SaleStore extends ChangeNotifier {
     );
   }
 
+  // ---------- cloud sync (Cloud Firestore, signed-in accounts only) ----------
+  //
+  //   users/{uid}/sales/{saleId}   one document per account (ID)
+  //   users/{uid}/meta/prefs       currency, games, channels, last rate note
+  //
+  // Firestore keeps its own offline cache and sends changes when the network
+  // is back, so writes are never awaited here (they would wait for the server).
+
+  SyncStatus _sync = SyncStatus.off;
+  SyncStatus get syncStatus => _sync;
+
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _salesSub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _prefsSub;
+
+  CollectionReference<Map<String, dynamic>> get _col => FirebaseFirestore.instance.collection('users').doc(_uid).collection('sales');
+  DocumentReference<Map<String, dynamic>> get _prefsDoc => FirebaseFirestore.instance.collection('users').doc(_uid).collection('meta').doc('prefs');
+
+  bool get _cloud => _uid.isNotEmpty;
+
+  void _fire(Future<void> f) => f.catchError((_) {});
+
+  void _startCloud() {
+    if (!_cloud) return;
+    _sync = SyncStatus.syncing;
+    try {
+      _salesSub = _col.snapshots(includeMetadataChanges: true).listen((snap) {
+        final pending = snap.metadata.hasPendingWrites;
+        final fromCache = snap.metadata.isFromCache;
+        if (!fromCache) {
+          // first answer from the server for this device
+          final seededKey = 'seeded-$_uid';
+          final seeded = _prefs?.getBool(seededKey) ?? false;
+          if (!seeded) {
+            _prefs?.setBool(seededKey, true);
+            if (snap.docs.isEmpty && _sales.isNotEmpty) {
+              _uploadAll(); // new cloud account: upload what is already on this device
+              _sync = SyncStatus.syncing;
+              notifyListeners();
+              return;
+            }
+          }
+        }
+        // a fresh install shows an empty cache first: never wipe local data with it
+        if (!(fromCache && snap.docs.isEmpty)) {
+          _sales = snap.docs.map((d) => Sale.fromJson({...d.data(), 'id': d.id})).toList();
+          for (final s in sorted().reversed) {
+            _games = _bump(_games, s.game);
+            _channels = _bump(_channels, s.channel);
+          }
+          _saveLocal();
+        }
+        _sync = pending ? SyncStatus.syncing : (fromCache ? SyncStatus.offline : SyncStatus.synced);
+        notifyListeners();
+      }, onError: (_) {
+        _sync = SyncStatus.offline;
+        notifyListeners();
+      });
+      _prefsSub = _prefsDoc.snapshots().listen((snap) {
+        final d = snap.data();
+        if (d == null) return;
+        final cur = d['currency'] as String?;
+        if (cur != null && currencySymbols.containsKey(cur)) _currency = cur;
+        _games = ((d['games'] as List?) ?? _games).whereType<String>().toList();
+        _channels = ((d['channels'] as List?) ?? _channels).whereType<String>().toList();
+        _rateNote = (d['rateNote'] as String?) ?? _rateNote;
+        _saveLocal();
+        notifyListeners();
+      }, onError: (_) {});
+    } catch (_) {
+      _sync = SyncStatus.offline;
+    }
+  }
+
+  /// Stops listening (call when the account is switched or signed out).
+  void stopSync() {
+    _salesSub?.cancel();
+    _prefsSub?.cancel();
+    _salesSub = null;
+    _prefsSub = null;
+  }
+
+  Map<String, dynamic> _prefsMap() => {'currency': _currency, 'games': _games, 'channels': _channels, 'rateNote': _rateNote};
+
+  void _pushPrefs() {
+    if (!_cloud) return;
+    _fire(_prefsDoc.set(_prefsMap(), SetOptions(merge: true)));
+  }
+
+  void _pushSale(Sale s) {
+    if (!_cloud) return;
+    _fire(_col.doc(s.id).set(s.toJson()));
+  }
+
+  void _uploadAll() {
+    if (!_cloud) return;
+    final batch = FirebaseFirestore.instance.batch();
+    for (final s in _sales) {
+      batch.set(_col.doc(s.id), s.toJson());
+    }
+    batch.set(_prefsDoc, _prefsMap(), SetOptions(merge: true));
+    _fire(batch.commit());
+  }
+
   String newId() =>
       '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}${Random().nextInt(1 << 20).toRadixString(36)}';
 
@@ -189,11 +315,14 @@ class SaleStore extends ChangeNotifier {
       _sales.add(sale);
     }
     await _persist();
+    _pushSale(sale);
+    _pushPrefs();
   }
 
   Future<void> remove(String id) async {
     _sales.removeWhere((s) => s.id == id);
     await _persist();
+    if (_cloud) _fire(_col.doc(id).delete());
   }
 
   /// Switch currency and convert every cost and price at today's rate.
@@ -231,6 +360,7 @@ class SaleStore extends ChangeNotifier {
     final rate = f >= 100 ? f.toStringAsFixed(0) : f.toStringAsFixed(f >= 1 ? 2 : 4);
     _rateNote = '1 $from = $rate $to  ·  ${fmtDate(rates.updated)}';
     await _persist();
+    _uploadAll();
     return null;
   }
 
@@ -451,10 +581,19 @@ class SaleStore extends ChangeNotifier {
       make(game: 'Free Fire', accountId: 'FF-77310452', status: SaleStatus.stock, cost: 90000, price: 200000, daysAgo: 6),
     ]);
     await _persist();
+    _uploadAll();
   }
 
   Future<void> clearDemo() async {
+    final ids = _sales.where((s) => s.demo).map((s) => s.id).toList();
     _sales.removeWhere((s) => s.demo);
     await _persist();
+    if (_cloud && ids.isNotEmpty) {
+      final batch = FirebaseFirestore.instance.batch();
+      for (final id in ids) {
+        batch.delete(_col.doc(id));
+      }
+      _fire(batch.commit());
+    }
   }
 }

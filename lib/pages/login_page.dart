@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/popup.dart';
 import '../widgets/ui.dart';
 
 /// First screen: sign in with Google or Facebook, or continue without login.
@@ -34,14 +35,28 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    await _run('email', () => _register ? widget.auth.registerWithEmail(_name.text, _email.text, _pass.text) : widget.auth.signInWithEmail(_email.text, _pass.text));
+    await _run(
+      'email',
+      () => _register ? widget.auth.registerWithEmail(_name.text, _email.text, _pass.text) : widget.auth.signInWithEmail(_email.text, _pass.text),
+      loading: _register ? 'ກຳລັງສ້າງບັນຊີ…' : 'ກຳລັງເຂົ້າສູ່ລະບົບ…',
+    );
   }
 
   Future<void> _forgot() async {
     final mail = _email.text.trim();
-    if (mail.isEmpty || !mail.contains('@')) return showToast(context, 'ໃສ່ອີເມລກ່ອນ ແລ້ວກົດລືມລະຫັດຜ່ານ');
-    final err = await widget.auth.resetPassword(mail);
-    if (mounted) showToast(context, err ?? 'ສົ່ງລິ້ງຕັ້ງລະຫັດຜ່ານໃໝ່ໄປທີ່ $mail ແລ້ວ');
+    if (mail.isEmpty || !mail.contains('@')) {
+      await showAppPopup(context, kind: PopupKind.warning, title: 'ໃສ່ອີເມລກ່ອນ', message: 'ພິມອີເມລຂອງທ່ານໃນຊ່ອງ ແລ້ວກົດ "ລືມລະຫັດຜ່ານ" ອີກຄັ້ງ');
+      return;
+    }
+    final err = await runWithLoading(context, () => widget.auth.resetPassword(mail), message: 'ກຳລັງສົ່ງລິ້ງ…');
+    if (!mounted) return;
+    if (err == null) {
+      await showAppPopup(context, kind: PopupKind.success, title: 'ສົ່ງລິ້ງແລ້ວ', message: 'ເປີດອີເມລ $mail ແລ້ວກົດລິ້ງເພື່ອຕັ້ງລະຫັດຜ່ານໃໝ່ (ກວດ Spam ນຳ)');
+    } else if (_isNetwork(err)) {
+      if (await problemPopup(context, message: err)) await _forgot();
+    } else {
+      await showAppPopup(context, kind: PopupKind.error, title: 'ສົ່ງບໍ່ສຳເລັດ', message: err);
+    }
   }
 
   Widget _input(String label, TextEditingController c, {bool password = false, TextInputType? keyboard, String? Function(String?)? validator, bool last = false}) {
@@ -159,13 +174,27 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Future<void> _run(String which, Future<String?> Function() action) async {
+  bool _isNetwork(String err) => err.contains('ອິນເຕີເນັດ');
+
+  /// Runs a login action. Email actions show the loading animation (and the
+  /// "slow network" hint); every error becomes a popup, network errors get "retry".
+  Future<void> _run(String which, Future<String?> Function() action, {String loading = 'ກຳລັງເຂົ້າສູ່ລະບົບ…'}) async {
     if (_busy != null) return;
     setState(() => _busy = which);
-    final err = await action();
-    if (!mounted) return;
-    setState(() => _busy = null);
-    if (err != null) showToast(context, err);
+    try {
+      while (mounted) {
+        final err = which == 'email' ? await runWithLoading(context, action, message: loading) : await action();
+        if (!mounted || err == null) return;
+        if (_isNetwork(err)) {
+          if (!await problemPopup(context, message: err)) return;
+          continue; // retry
+        }
+        await showAppPopup(context, kind: PopupKind.error, title: 'ເຂົ້າສູ່ລະບົບບໍ່ສຳເລັດ', message: err);
+        return;
+      }
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
   }
 
   Widget _providerButton({

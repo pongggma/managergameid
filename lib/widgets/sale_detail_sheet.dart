@@ -5,6 +5,7 @@ import '../data/sale_store.dart';
 import '../models/sale.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import 'popup.dart';
 import 'ui.dart';
 
 typedef SaleCallback = void Function(Sale sale);
@@ -44,26 +45,13 @@ class _SaleDetailSheetState extends State<SaleDetailSheet> {
   }
 
   Future<void> _delete(Sale s) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        backgroundColor: const Color(0xFF1A171F),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: Text('ລຶບລາຍການນີ້?', style: sans(size: 18, weight: FontWeight.w600)),
-        content: Text(s.game, style: sans(color: AppColors.muted)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text('ຍົກເລີກ', style: sans(color: AppColors.muted))),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.loss, foregroundColor: const Color(0xFF2A0610)),
-            onPressed: () => Navigator.pop(c, true),
-            child: Text('ລຶບ', style: sans(weight: FontWeight.w600, color: const Color(0xFF2A0610))),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
+    final ok = await confirmPopup(context, title: 'ລຶບລາຍການນີ້?', message: s.game, confirmLabel: 'ລຶບ', destructive: true);
+    if (ok) {
       await widget.store.remove(s.id);
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      final root = Navigator.of(context, rootNavigator: true).context;
+      Navigator.pop(context);
+      successPopup(root, 'ລຶບແລ້ວ');
     }
   }
 

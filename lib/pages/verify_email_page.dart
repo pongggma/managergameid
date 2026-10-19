@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/ui.dart';
+import '../widgets/popup.dart';
 
 /// Shown after registering (or logging in) with an unconfirmed email.
 /// It checks by itself every few seconds, so it closes as soon as the link is tapped.
@@ -38,18 +38,27 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
 
   Future<void> _check() async {
     setState(() => _checking = true);
-    final ok = await widget.auth.checkVerified();
+    final ok = await runWithLoading(context, widget.auth.checkVerified, message: 'ກຳລັງກວດສອບ…');
     if (!mounted) return;
     setState(() => _checking = false);
-    if (!ok) showToast(context, 'ຍັງບໍ່ໄດ້ຢືນຢັນ ເປີດອີເມລແລ້ວກົດລິ້ງກ່ອນ');
+    if (!ok) {
+      await showAppPopup(context, kind: PopupKind.info, title: 'ຍັງບໍ່ໄດ້ຢືນຢັນ', message: 'ເປີດອີເມລຂອງທ່ານ ແລ້ວກົດລິ້ງຢືນຢັນກ່ອນ ຈາກນັ້ນກົດປຸ່ມນີ້ອີກຄັ້ງ');
+    }
   }
 
   Future<void> _resend() async {
     if (_cooldown > 0) return;
-    final err = await widget.auth.resendVerification();
+    final err = await runWithLoading(context, widget.auth.resendVerification, message: 'ກຳລັງສົ່ງອີເມລ…');
     if (!mounted) return;
-    showToast(context, err ?? 'ສົ່ງອີເມລຢືນຢັນອີກຄັ້ງແລ້ວ');
-    if (err != null) return;
+    if (err != null) {
+      if (err.contains('ອິນເຕີເນັດ')) {
+        if (await problemPopup(context, message: err)) await _resend();
+      } else {
+        await showAppPopup(context, kind: PopupKind.error, title: 'ສົ່ງບໍ່ສຳເລັດ', message: err);
+      }
+      return;
+    }
+    showAppPopup(context, kind: PopupKind.success, title: 'ສົ່ງອີເມລແລ້ວ', message: 'ກວດອີເມລຂອງທ່ານ (ລວມທັງ Spam)', autoClose: const Duration(seconds: 2));
     setState(() => _cooldown = 60);
     _tick?.cancel();
     _tick = Timer.periodic(const Duration(seconds: 1), (t) {

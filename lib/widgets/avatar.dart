@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import 'popup.dart';
 import 'ui.dart';
 
 /// Six original characters, drawn in code. They are inspired by classic game
@@ -84,11 +85,16 @@ class _ProfileSheetState extends State<_ProfileSheet> {
   Future<void> _save() async {
     setState(() => _saving = true);
     await widget.auth.setAvatar(_pick);
-    final err = await widget.auth.setName(_name.text);
+    final err = await runWithLoading(context, () => widget.auth.setName(_name.text), message: 'ກຳລັງບັນທຶກ…');
     if (!mounted) return;
     setState(() => _saving = false);
-    if (err != null) return showToast(context, err);
+    if (err != null) {
+      if (await problemPopup(context, message: err)) await _save();
+      return;
+    }
+    final root = Navigator.of(context, rootNavigator: true).context;
     Navigator.pop(context);
+    successPopup(root, 'ບັນທຶກໂປຣໄຟລ໌ແລ້ວ');
   }
 
   @override

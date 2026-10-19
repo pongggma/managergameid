@@ -95,7 +95,7 @@ class _ListPageState extends State<ListPage> {
             key: ValueKey(s.id),
             sale: s,
             currency: store.currency,
-            logoUrl: store.logoUrl(s.game),
+            logoUrl: store.logoUrl(s.game), logoLoading: store.logoLoading(s.game),
             onTap: () => widget.onOpenDetail(s),
           );
         },

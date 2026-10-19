@@ -69,6 +69,7 @@ class _RootState extends State<_Root> {
     final suffix = widget.auth.storageSuffix;
     if (_loadedFor == suffix && _store != null) return;
     _loadedFor = suffix;
+    _store?.stopSync();
     final st = SaleStore(suffix: suffix);
     _store = null;
     _loading = st.load().then((_) {
@@ -83,11 +84,13 @@ class _RootState extends State<_Root> {
       builder: (context, _) {
         if (widget.auth.needsVerification) {
           _loadedFor = null;
+          _store?.stopSync();
           _store = null;
           return VerifyEmailPage(auth: widget.auth);
         }
         if (!widget.auth.hasSession) {
           _loadedFor = null;
+          _store?.stopSync();
           _store = null;
           return LoginPage(auth: widget.auth);
         }

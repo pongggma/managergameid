@@ -7,6 +7,7 @@ import '../data/sale_store.dart';
 import '../models/sale.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import 'popup.dart';
 import 'ui.dart';
 
 /// Add / edit sheet for the account itself: game, ID, email, password, cost.
@@ -99,7 +100,11 @@ class _SaleFormSheetState extends State<SaleFormSheet> {
       demo: old?.demo ?? false,
     );
     await widget.store.upsert(sale);
-    if (mounted) Navigator.pop(context);
+    if (!mounted) return true;
+    final root = Navigator.of(context, rootNavigator: true).context;
+    final wasEdit = old != null;
+    Navigator.pop(context);
+    successPopup(root, wasEdit ? 'ບັນທຶກການແກ້ໄຂແລ້ວ' : 'ເພີ່ມໄອດີແລ້ວ', message: sale.game);
     return true;
   }
 
@@ -281,7 +286,7 @@ class _SaleFormSheetState extends State<SaleFormSheet> {
           padding: const EdgeInsets.fromLTRB(12, 10, 18, 12),
           child: Row(
             children: [
-              Coin(typed.isEmpty ? '?' : typed, size: 48, logoUrl: logo),
+              Coin(typed.isEmpty ? '?' : typed, size: 48, logoUrl: logo, loading: _logoName.isNotEmpty && widget.store.logoLoading(_logoName)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

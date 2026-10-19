@@ -5,6 +5,7 @@ import '../data/sale_store.dart';
 import '../models/sale.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
+import 'popup.dart';
 import 'ui.dart';
 
 /// Opens from the "ຂາຍ" button after an account was added.
@@ -93,7 +94,12 @@ class _SaleSellSheetState extends State<SaleSellSheet> {
       createdAt: o.createdAt,
       demo: o.demo,
     ));
-    if (mounted) Navigator.pop(context);
+    if (!mounted) return true;
+    final root = Navigator.of(context, rootNavigator: true).context;
+    final profit = (_num(_price.text) ?? 0) - o.cost;
+    final cur = widget.store.currency;
+    Navigator.pop(context);
+    successPopup(root, 'ບັນທຶກການຂາຍແລ້ວ', message: '${o.game} · ກຳໄລ ${money(profit, cur, signed: true)}');
     return true;
   }
 
@@ -111,7 +117,10 @@ class _SaleSellSheetState extends State<SaleSellSheet> {
       createdAt: o.createdAt,
       demo: o.demo,
     ));
-    if (mounted) Navigator.pop(context);
+    if (!mounted) return;
+    final root = Navigator.of(context, rootNavigator: true).context;
+    Navigator.pop(context);
+    successPopup(root, 'ຍົກເລີກການຂາຍແລ້ວ', message: o.game);
   }
 
   InputDecoration _bare({String? hint}) => InputDecoration(
